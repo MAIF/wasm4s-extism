@@ -4,6 +4,9 @@ import com.sun.jna.Pointer;
 import org.extism.sdk.manifest.Manifest;
 import org.extism.sdk.support.JsonSerde;
 
+import org.extism.sdk.Parameters;
+import org.extism.sdk.Results;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -17,28 +20,27 @@ public class Plugin implements AutoCloseable {
      */
     private final Pointer pluginPointer;
 
-    /**
-     * @param manifestBytes The manifest for the plugin
-     * @param functions     The Host functions for th eplugin
-     * @param withWASI      Set to true to enable WASI
-     */
-    public Plugin(byte[] manifestBytes, boolean withWASI, HostFunction[] functions) {
+    public Plugin(byte[] manifestBytes,
+                  boolean withWASI,
+                  HostFunction[] functions,
+                  LinearMemory[] memories) {
 
         Objects.requireNonNull(manifestBytes, "manifestBytes");
 
-        Pointer[] ptrArr = new Pointer[functions == null ? 0 : functions.length];
-
-        if (functions != null)
-            for (int i = 0; i < functions.length; i++) {
-               ptrArr[i] = functions[i].pointer;
-            }
+        Pointer[] functionsPtr = HostFunction.arrayToPointer(functions);
+        Pointer[] memoriesPtr = LinearMemory.arrayToPointer(memories);
 
         Pointer[] errormsg = new Pointer[1];
-        Pointer p = LibExtism.INSTANCE.extism_plugin_new(manifestBytes, manifestBytes.length,
-                ptrArr,
+        Pointer p = LibExtism.INSTANCE.extism_plugin_new(manifestBytes,
+                manifestBytes.length,
+                functionsPtr,
                 functions == null ? 0 : functions.length,
                 withWASI,
-                errormsg);
+                memoriesPtr,
+                memories == null ? 0 : memories.length,
+                errormsg
+        );
+
         if (p == null) {
             int errlen = LibExtism.INSTANCE.strlen(errormsg[0]);
             byte[] msg = new byte[errlen];
@@ -51,9 +53,13 @@ public class Plugin implements AutoCloseable {
     }
 
     public Plugin(Manifest manifest, boolean withWASI, HostFunction[] functions) {
-        this(serialize(manifest), withWASI, functions);
+        this(serialize(manifest), withWASI, functions, null);
     }
 
+
+    public Plugin(Manifest manifest, boolean withWASI, HostFunction[] functions, LinearMemory[] memories) {
+        this(serialize(manifest), withWASI, functions, memories);
+    }
 
     private static byte[] serialize(Manifest manifest) {
         Objects.requireNonNull(manifest, "manifest");
@@ -84,7 +90,6 @@ public class Plugin implements AutoCloseable {
         return output.getByteArray(0, length);
     }
 
-
     /**
      * Invoke a function with the given name and input.
      *
@@ -110,6 +115,37 @@ public class Plugin implements AutoCloseable {
         return LibExtism.INSTANCE.extism_plugin_error(this.pluginPointer);
     }
 
+    public Results call(String functionName, Parameters params, int resultsLength) {
+        return call(functionName, params, resultsLength, new byte[0]);
+    }
+
+    public Results call(String functionName, Parameters params, int resultsLength, byte[] input) {
+        params.getPtr().write();
+
+        LibExtism.ExtismVal.ByReference results = LibExtism.INSTANCE.wasm_plugin_call(
+                this.pluginPointer,
+                functionName,
+                params.getPtr(),
+                params.getLength(),
+                input,
+                input.length);
+
+        if (results == null && resultsLength > 0) {
+            String error = error();
+            throw new ExtismException(error);
+        }
+
+        if (results == null) {
+            if (resultsLength > 0) {
+                String error = error();
+                throw new ExtismException(error);
+            } else {
+                return new Results(0);
+            }
+        } else {
+            return new Results(results, resultsLength);
+        }
+    }
     /**
      * Frees a plugin from memory
      */
@@ -128,6 +164,7 @@ public class Plugin implements AutoCloseable {
         return updateConfig(json.getBytes(StandardCharsets.UTF_8));
     }
 
+
     /**
      * Update plugin config values, this will merge with the existing values.
      *
@@ -140,18 +177,51 @@ public class Plugin implements AutoCloseable {
     }
 
     /**
-     * Calls {@link #free()} if used in the context of a TWR block.
-     */
-    @Override
-    public void close() {
-        free();
-    }
-
-    /**
      * Return a new `CancelHandle`, which can be used to cancel a running Plugin
      */
     public CancelHandle cancelHandle() {
         Pointer handle = LibExtism.INSTANCE.extism_plugin_cancel_handle(this.pluginPointer);
         return new CancelHandle(handle);
+    }
+
+    public void reset() {
+        LibExtism.INSTANCE.extism_reset(this.pluginPointer);
+    }
+
+    public Pointer callWithoutParams(String functionName, int resultsLength) {
+        Pointer results = LibExtism.INSTANCE.wasm_plugin_call_without_params(
+                this.pluginPointer,
+                functionName,
+                new byte[0],
+                0);
+
+
+        if (results == null) {
+            if (resultsLength > 0) {
+                String error = error();
+                throw new ExtismException(error);
+            } else {
+                return null;
+            }
+        } else {
+            return results;
+        }
+    }
+
+    public void callWithoutResults(String functionName, Parameters params) {
+        params.getPtr().write();
+
+        LibExtism.INSTANCE.wasm_plugin_call_without_results(
+                this.pluginPointer,
+                functionName,
+                params.getPtr(),
+                params.getLength(),
+                new byte[0],
+                0);
+    }
+
+    @Override
+    public void close() throws Exception {
+        free();
     }
 }

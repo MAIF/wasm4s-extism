@@ -15,6 +15,7 @@ pub(crate) mod pdk;
 mod plugin;
 mod plugin_builder;
 mod timer;
+pub(crate) mod otoroshi;
 
 /// Extism C API
 pub mod sdk;

@@ -19,6 +19,15 @@ public enum TestWasmSources {
         public Path getWasmFunctionsFilePath() {
             return Paths.get(WASM_LOCATION, "code-functions.wasm");
         }
+        public Path getWasmWebAssemblyFunctionFilePath() {
+            return Paths.get(WASM_LOCATION, "functions.wasm");
+        }
+
+        public Path getRawAdditionFilePath() {
+            return Paths.get(WASM_LOCATION, "addition.wasm");
+        }
+
+        public Path getCorazaFilePath() { return Paths.get(WASM_LOCATION, "coraza.wasm"); }
     };
 
     public static final String WASM_LOCATION = "src/test/resources";
@@ -27,12 +36,30 @@ public enum TestWasmSources {
 
     public abstract Path getWasmFunctionsFilePath();
 
+    public abstract Path getRawAdditionFilePath();
+
+    public abstract Path getCorazaFilePath();
+
+    public abstract Path getWasmWebAssemblyFunctionFilePath();
+
     public PathWasmSource pathWasmSource() {
         return resolvePathWasmSource(getWasmFilePath());
     }
 
     public PathWasmSource pathWasmFunctionsSource() {
         return resolvePathWasmSource(getWasmFunctionsFilePath());
+    }
+
+    public PathWasmSource getRawAdditionPath() {
+        return resolvePathWasmSource(getRawAdditionFilePath());
+    }
+
+    public PathWasmSource getCorazaPath() {
+        return resolvePathWasmSource(getCorazaFilePath());
+    }
+
+    public PathWasmSource pathWasmWebAssemblyFunctionSource() {
+        return resolvePathWasmSource(getWasmWebAssemblyFunctionFilePath());
     }
 
     public ByteArrayWasmSource byteArrayWasmSource() {

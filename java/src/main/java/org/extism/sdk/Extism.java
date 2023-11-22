@@ -43,6 +43,8 @@ public class Extism {
     public static String invokeFunction(Manifest manifest, String function, String input) throws ExtismException {
         try (var plugin = new Plugin(manifest, false, null)) {
             return plugin.call(function, input);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 

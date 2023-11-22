@@ -6,17 +6,17 @@ import org.extism.sdk.manifest.MemoryOptions;
 import org.extism.sdk.wasm.WasmSourceResolver;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.extism.sdk.TestWasmSources.CODE;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class PluginTests {
-
-    // static {
-    //     Extism.setLogFile(Paths.get("/tmp/extism.log"), Extism.LogLevel.TRACE);
-    // }
 
     @Test
     public void shouldInvokeFunctionWithMemoryOptions() {
@@ -58,7 +58,18 @@ public class PluginTests {
     }
 
     @Test
-    public void shouldAllowInvokeFunctionFromFileWasmSourceApiUsageExample() {
+    public void shouldAllowInvokeFunctionFromFileWasmSourceMultipleTimes() {
+        var wasmSource = CODE.pathWasmSource();
+        var manifest = new Manifest(wasmSource);
+        var output = Extism.invokeFunction(manifest, "count_vowels", "Hello World");
+        assertThat(output).isEqualTo("{\"count\": 3}");
+
+        output = Extism.invokeFunction(manifest, "count_vowels", "Hello World");
+        assertThat(output).isEqualTo("{\"count\": 3}");
+    }
+
+    @Test
+    public void shouldAllowInvokeFunctionFromFileWasmSourceApiUsageExample() throws Exception {
 
         var wasmSourceResolver = new WasmSourceResolver();
         var manifest = new Manifest(wasmSourceResolver.resolve(CODE.getWasmFilePath()));
@@ -68,21 +79,6 @@ public class PluginTests {
 
         try (var plugin = new Plugin(manifest, false, null)) {
             var output = plugin.call(functionName, input);
-            assertThat(output).isEqualTo("{\"count\": 3}");
-        }
-    }
-
-    @Test
-    public void shouldAllowInvokeFunctionFromFileWasmSourceMultipleTimes() {
-        var manifest = new Manifest(CODE.pathWasmSource());
-        var functionName = "count_vowels";
-        var input = "Hello World";
-
-        try (var plugin = new Plugin(manifest, false, null)) {
-            var output = plugin.call(functionName, input);
-            assertThat(output).isEqualTo("{\"count\": 3}");
-
-            output = plugin.call(functionName, input);
             assertThat(output).isEqualTo("{\"count\": 3}");
         }
     }
@@ -131,11 +127,13 @@ public class PluginTests {
         try (var plugin = new Plugin(manifest, true, functions)) {
             var output = plugin.call(functionName, "this is a test");
             assertThat(output).isEqualTo("test");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
     @Test
-    public void shouldAllowInvokeHostFunctionWithoutUserData() {
+    public void shouldAllowInvokeHostFunctionWithoutUserData() throws Exception {
 
         var parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
         var resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
@@ -151,6 +149,7 @@ public class PluginTests {
 
             assertThat(data.isEmpty());
         };
+
 
         HostFunction f = new HostFunction<>(
                 "hello_world",
@@ -194,5 +193,4 @@ public class PluginTests {
             assertThat(e.getMessage()).contains("unknown import: `env::hello_world` has not been defined");
         }
     }
-
 }

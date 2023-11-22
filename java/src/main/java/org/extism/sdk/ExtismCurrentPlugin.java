@@ -19,6 +19,10 @@ public class ExtismCurrentPlugin {
         return LibExtism.INSTANCE.extism_current_plugin_memory_alloc(this.pointer, n);
     }
 
+    public Pointer getLinearMemory(int instanceIndex, String memoryName) {
+        return LibExtism.INSTANCE.extism_get_lineary_memory_from_host_functions(this.pointer, instanceIndex, memoryName);
+    }
+
     public void free(long offset) {
         LibExtism.INSTANCE.extism_current_plugin_memory_free(this.pointer, offset);
     }
@@ -49,6 +53,15 @@ public class ExtismCurrentPlugin {
     }
 
     /**
+     * Return int from a host function
+     * @param output - The output to set
+     * @param v - The int to return
+     */
+    public void returnInt(LibExtism.ExtismVal output, int v) {
+        output.v.i32 = v;
+    }
+
+    /**
      * Get bytes from host function parameter
      * @param input - The input to read
      */
@@ -66,7 +79,6 @@ public class ExtismCurrentPlugin {
                 throw new ExtismException("inputBytes error: ExtismValType " + LibExtism.ExtismValType.values()[input.t] + " not implemtented");
         }
     }
-
 
     /**
      * Get string from host function parameter
