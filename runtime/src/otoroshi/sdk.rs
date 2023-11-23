@@ -4,7 +4,9 @@ use std::os::raw::c_char;
 
 use tracing::{error, debug};
 
-use crate::{otoroshi::*, Plugin, sdk::{ExtismVal, Size}, function};
+use crate::{otoroshi::*, Plugin, sdk::{ExtismVal, Size, ExtismFunction, extism_plugin_new}, function};
+
+use super::types::ExtismMemory;
 
 #[no_mangle]
 pub(crate) unsafe fn wasm_otoroshi_plugin_call_native(
@@ -172,13 +174,17 @@ pub(crate) unsafe extern "C" fn wasm_otoroshi_call(
 //     }
 // }
 
-// /// Remove all plugins from the registry
-// #[no_mangle]
-// pub unsafe extern "C" fn wasm_otoroshi_extism_reset(instance_ptr: *mut WasmPlugin) {
-//     let plugin = &mut *instance_ptr;
+/// Remove all plugins from the registry
+#[no_mangle]
+pub unsafe extern "C" fn wasm_otoroshi_extism_reset(
+    plugin: *mut Plugin
+) {
+    let plugin = &mut *plugin;
+    let lock = plugin.instance.clone();
+    let mut lock = lock.lock().unwrap();
 
-//     plugin.memory.reset()
-// }
+    let _ = plugin.reset_store(&mut lock);
+}
 
 // #[no_mangle]
 // pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
@@ -232,57 +238,55 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
 
 
 
-// #[no_mangle]
-// pub(crate) unsafe extern "C" fn extism_plugin_new_with_memories(
-//     engine_ptr: *mut Engine,
-//     template_ptr: *mut PluginTemplate,
-//     functions: *mut *const ExtismFunction,
-//     n_functions: Size,
-//     memories: *mut *const ExtismMemory,
-//     n_memories: i8,
-//     with_wasi: bool,
-// ) -> *mut WasmPlugin {
-//     let engine: &Engine = unsafe { &*engine_ptr };
+#[no_mangle]
+pub(crate) unsafe extern "C" fn extism_plugin_new_with_memories(
+    wasm: *const u8,
+    wasm_size: Size,
+    functions: *mut *const ExtismFunction,
+    n_functions: Size,
+    memories: *mut *const ExtismMemory,
+    n_memories: i8,
+    with_wasi: bool,
+    errmsg: *mut *mut std::ffi::c_char
+) -> *mut Plugin {
 
-//     let template: &PluginTemplate = unsafe { &*template_ptr };
+    let plugin = extism_plugin_new(wasm, wasm_size, functions, n_functions, with_wasi, errmsg);
 
-//     let mut funcs = vec![];
+    let mut mems: Vec<&WasmMemory> = vec![];
 
-//     if !functions.is_null() {
-//         for i in 0..n_functions {
-//             unsafe {
-//                 let f = *functions.add(i as usize);
-//                 if f.is_null() {
-//                     continue;
-//                 }
-//                 let f = &*f;
-//                 funcs.push(&f.0);
-//             }
-//         }
-//     }
+    if !memories.is_null() {
+        for i in 0..n_memories {
+            unsafe {
+                let f = *memories.add(i as usize);
+                if f.is_null() {
+                    continue;
+                }
+                let f = &*f;
+                mems.push(&f.0);
+            }
+        }
+    }    
 
-//     let mut mems: Vec<&WasmMemory> = vec![];
+    for m in mems {
+        let name = m.name.to_string();
+        let ns = m.namespace.to_string();
 
-//     if !memories.is_null() {
-//         for i in 0..n_memories {
-//             unsafe {
-//                 let f = *memories.add(i as usize);
-//                 if f.is_null() {
-//                     continue;
-//                 }
-//                 let f = &*f;
-//                 mems.push(&f.0);
-//             }
-//         }
-//     }
 
-//     match template.instantiate(engine, funcs, mems, with_wasi) {
-//         Err(err) => panic!("{}", err), //std::ptr::null_mut(),
-//         Ok(instance) => {
-//             let inst = Box::into_raw(Box::new(instance));
-//             let plugin = unsafe { &mut *inst };
-//             plugin.borrow_mut().set_wasm_plugin();
-//             inst
-//         }
-//     }
-// }
+        let mem = wasmtime::Memory::new(
+            &mut (*plugin).store, 
+            m.ty.clone()).unwrap(); // TODO - dont do that
+        (*plugin).linker.define(&mut (*plugin).store, &ns, &name, mem).unwrap();
+    }
+
+    plugin
+ 
+    // match template.instantiate(engine, funcs, mems, with_wasi) {
+    //     Err(err) => panic!("{}", err), //std::ptr::null_mut(),
+    //     Ok(instance) => {
+    //         let inst = Box::into_raw(Box::new(instance));
+    //         let plugin = unsafe { &mut *inst };
+    //         plugin.borrow_mut().set_wasm_plugin();
+    //         inst
+    //     }
+    // }
+}

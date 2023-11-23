@@ -60,6 +60,8 @@ typedef struct ExtismCurrentPlugin ExtismCurrentPlugin;
 
 typedef struct ExtismFunction ExtismFunction;
 
+typedef struct ExtismMemory ExtismMemory;
+
 /**
  * Plugin contains everything needed to execute a WASM function
  */
@@ -107,7 +109,21 @@ ExtismVal *wasm_otoroshi_call(ExtismPlugin *plugin,
                               const ExtismVal *params,
                               ExtismSize n_params);
 
+/**
+ * Remove all plugins from the registry
+ */
+void wasm_otoroshi_extism_reset(ExtismPlugin *plugin);
+
 uint8_t *wasm_otoroshi_extism_get_memory(ExtismPlugin *plugin, const char *name);
+
+ExtismPlugin *extism_plugin_new_with_memories(const uint8_t *wasm,
+                                              ExtismSize wasm_size,
+                                              const ExtismFunction **functions,
+                                              ExtismSize n_functions,
+                                              const ExtismMemory **memories,
+                                              int8_t n_memories,
+                                              bool with_wasi,
+                                              char **errmsg);
 
 /**
  * Get a plugin's ID, the returned bytes are a 16 byte buffer that represent a UUIDv4

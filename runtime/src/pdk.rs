@@ -335,6 +335,19 @@ pub(crate) fn log_debug(
     log(tracing::Level::DEBUG, caller, input, _output)
 }
 
+
+// TODO - ADDED
+
+/// Returns: i32 (byte)
+pub(crate) fn load_u8(
+    caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+
+    Ok(())
+}
+
 /// Write to logs (error)
 /// Params: i64 (offset)
 /// Returns: none
@@ -344,4 +357,131 @@ pub(crate) fn log_error(
     _output: &mut [Val],
 ) -> Result<(), Error> {
     log(tracing::Level::ERROR, caller, input, _output)
+}
+
+
+/// Allocate bytes
+/// Params: i64 (length)
+/// Returns: i64 (offset)
+pub(crate) fn alloc(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+    
+    Ok(())
+}
+
+/// Free memory
+/// Params: i64 (offset)
+/// Returns: none
+pub(crate) fn free(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    _output: &mut [Val],
+) -> Result<(), Error> {
+   
+    Ok(())
+}
+
+/// Set the error message, this can be checked by the host program
+/// Params: i64 (offset)
+/// Returns: none
+pub(crate) fn error_set(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    _output: &mut [Val],
+) -> Result<(), Error> {
+    
+    Ok(())
+}
+
+
+/// Store an unsigned 64 bit integer in memory
+/// Params: i64 (offset), i64 (int)
+/// Returns: none
+pub(crate) fn store_u64(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    _output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Load an unsigned 64 bit integer from memory
+/// Params: i64 (offset)
+/// Returns: i64 (int)
+pub(crate) fn load_u64(
+    caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Set output offset and length
+/// Params: i64 (offset), i64 (length)
+/// Returns: none
+pub(crate) fn output_set(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    _output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Store a byte in memory
+/// Params: i64 (offset), i32 (byte)
+/// Returns: none
+pub(crate) fn store_u8(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    _output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Get the input length
+/// Params: none
+/// Returns: i64 (length)
+pub(crate) fn input_length(
+    caller: Caller<CurrentPlugin>,
+    _input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Load a byte from input
+/// Params: i64 (offset)
+/// Returns: i32 (byte)
+pub(crate) fn input_load_u8(
+    caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Load an unsigned 64 bit integer from input
+/// Params: i64 (offset)
+/// Returns: i64 (int)
+pub(crate) fn input_load_u64(
+    caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Get the length of an allocated block given the offset
+/// Params: i64 (offset)
+/// Returns: i64 (length or 0)
+pub(crate) fn length(
+    mut caller: Caller<CurrentPlugin>,
+    input: &[Val],
+    output: &mut [Val],
+) -> Result<(), Error> {
+
+    Ok(())
 }

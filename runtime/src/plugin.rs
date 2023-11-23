@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use crate::*;
 
-pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
+// TODO - ADDED
+// pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
+pub const EXTISM_ENV_MODULE: &str = "env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
 
 #[derive(Default, Clone)]
@@ -210,7 +212,8 @@ impl Plugin {
             ($($name:ident($($args:expr),*) $(-> $($r:expr),*)?);* $(;)?) => {
                 $(
                     let t = FuncType::new([$($args),*], [$($($r),*)?]);
-                    linker.func_new(EXTISM_ENV_MODULE, stringify!($name), t, pdk::$name)?;
+                    // TODO - ADDED
+                    linker.func_new(EXTISM_ENV_MODULE, concat!("extism_", stringify!($name)), t, pdk::$name)?;
                 )*
             };
         }
@@ -227,6 +230,20 @@ impl Plugin {
             log_info(I64);
             log_debug(I64);
             log_error(I64);
+
+            // TODO
+            alloc(I64) -> I64;
+            free(I64);
+            load_u8(I64) -> I32;
+            load_u64(I64) -> I64;
+            store_u8(I64, I32);
+            store_u64(I64, I64);
+            input_length() -> I64;
+            input_load_u8(I64) -> I32;
+            input_load_u64(I64) -> I64;
+            output_set(I64, I64);
+            error_set(I64);
+            length(I64) -> I64;
         );
 
         for f in &mut imports {
