@@ -82,6 +82,14 @@ public class Plugin implements AutoCloseable {
         this.pluginPointer = p;
     }
 
+    // TODO - ADDED
+    public Plugin(Manifest manifest,
+                  boolean withWASI,
+                  HostFunction[] functions,
+                  LinearMemory[] memories) {
+        this(serialize(manifest), withWASI, functions, memories);
+    }
+
     public Plugin(Manifest manifest, boolean withWASI, HostFunction[] functions) {
         this(serialize(manifest), withWASI, functions);
     }

@@ -13,19 +13,23 @@ pub static EXTISM_SUCCESS: i32 = 0;
 
 /// A union type for host function argument/return values
 #[repr(C)]
+// TODO - ADDED
+#[derive(Copy, Clone)]
 pub union ValUnion {
-    i32: i32,
-    i64: i64,
-    f32: f32,
-    f64: f64,
+    pub i32: i32,
+    pub i64: i64,
+    pub f32: f32,
+    pub f64: f64,
     // TODO: v128, ExternRef, FuncRef
 }
 
 /// `ExtismVal` holds the type and value of a function argument/return
 #[repr(C)]
+/// TODO - ADDED
+#[derive(Clone)]
 pub struct ExtismVal {
-    t: ValType,
-    v: ValUnion,
+    pub t: ValType,
+    pub v: ValUnion,
 }
 
 /// Host function signature
@@ -482,7 +486,7 @@ pub unsafe extern "C" fn extism_plugin_call(
         name
     );
     let input = std::slice::from_raw_parts(data, data_len as usize);
-    let res = plugin.raw_call(&mut lock, name, input);
+    let res = plugin.raw_call(&mut lock, name, input, true, None, None);
 
     match res {
         Err((e, rc)) => plugin.return_error(&mut lock, e, rc),

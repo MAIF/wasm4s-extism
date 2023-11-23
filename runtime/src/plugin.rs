@@ -560,6 +560,23 @@ impl Plugin {
         Ok(())
     }
 
+    // TODO - ADDED
+    pub(crate) fn get_memory(
+        &mut self,
+        instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
+        name: impl AsRef<str>,
+    ) -> *mut u8 {
+        if let Some(instance) = &mut **instance_lock {
+            match instance
+                .get_memory(&mut self.store, name.as_ref()) {
+                    Some(memory) => memory.data_mut(&mut self.store).as_mut_ptr(),
+                    None => std::ptr::null_mut()
+                }
+        } else {
+            std::ptr::null_mut()
+        }
+    }
+
     // Implements the build of the `call` function, `raw_call` is also used in the SDK
     // code
     pub(crate) fn raw_call(
@@ -567,6 +584,9 @@ impl Plugin {
         lock: &mut std::sync::MutexGuard<Option<Instance>>,
         name: impl AsRef<str>,
         input: impl AsRef<[u8]>,
+        use_extism: bool,
+        params: Option<Vec<Val>>,
+        raw_results: Option<&mut Vec<Val>>,
     ) -> Result<i32, (Error, i32)> {
         let name = name.as_ref();
         let input = input.as_ref();
@@ -583,8 +603,10 @@ impl Plugin {
 
         self.instantiate(lock).map_err(|e| (e, -1))?;
 
-        self.set_input(input.as_ptr(), input.len())
-            .map_err(|x| (x, -1))?;
+        if use_extism {
+            self.set_input(input.as_ptr(), input.len())
+                .map_err(|x| (x, -1))?;
+        }
 
         let func = match self.get_func(lock, name) {
             Some(x) => x,
@@ -593,11 +615,14 @@ impl Plugin {
 
         // Check the number of results, reject functions with more than 1 result
         let n_results = func.ty(self.store()).results().len();
-        if n_results > 1 {
-            return Err((
-                anyhow::anyhow!("Function {name} has {n_results} results, expected 0 or 1"),
-                -1,
-            ));
+
+        if use_extism {
+            if n_results > 1 {
+                return Err((
+                    anyhow::anyhow!("Function {name} has {n_results} results, expected 0 or 1"),
+                    -1,
+                ));
+            }
         }
 
         // Start timer
@@ -615,9 +640,23 @@ impl Plugin {
         self.store.epoch_deadline_trap();
         self.store.set_epoch_deadline(1);
 
-        // Call the function
         let mut results = vec![wasmtime::Val::null(); n_results];
-        let mut res = func.call(self.store_mut(), &[], results.as_mut_slice());
+        // Call the function
+
+        let mut res: Result<()> = if use_extism {
+            func.call(self.store_mut(), &[], results.as_mut_slice())
+        } else {
+            func.call(
+                self.store_mut(),
+                &params.unwrap()[..],
+                results.as_mut_slice(),
+            )
+        };
+
+        if !use_extism {
+            (*(raw_results.unwrap())).extend_from_slice(&results[..]);
+            // *(raw_results.unwrap()) = ;
+        }
 
         // Stop timer
         self.store
@@ -626,7 +665,10 @@ impl Plugin {
         self.needs_reset = name == "_start";
 
         // Get extism error
-        self.get_output_after_call().map_err(|x| (x, -1))?;
+        if use_extism {
+            self.get_output_after_call().map_err(|x| (x, -1))?;
+        }
+
         let mut rc = 0;
         if !results.is_empty() {
             rc = results[0].i32().unwrap_or(-1);
@@ -770,7 +812,7 @@ impl Plugin {
         let lock = self.instance.clone();
         let mut lock = lock.lock().unwrap();
         let data = input.to_bytes()?;
-        self.raw_call(&mut lock, name, data)
+        self.raw_call(&mut lock, name, data, false, None, None)
             .map_err(|e| e.0)
             .and_then(move |_| self.output())
     }

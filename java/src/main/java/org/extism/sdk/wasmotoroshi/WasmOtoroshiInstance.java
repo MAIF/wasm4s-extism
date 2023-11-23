@@ -16,6 +16,10 @@ public class WasmOtoroshiInstance extends Plugin {
         super(manifestBytes, withWASI, functions, memories);
     }
 
+    public WasmOtoroshiInstance(Manifest manifest, boolean withWASI, HostFunction[] functions, LinearMemory[] memories) {
+        super(manifest, withWASI, functions, memories);
+    }
+
     public WasmOtoroshiInstance(byte[] manifestBytes, boolean withWASI, HostFunction[] functions) {
         super(manifestBytes, withWASI, functions);
     }

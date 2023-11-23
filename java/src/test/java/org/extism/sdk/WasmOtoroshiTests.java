@@ -47,10 +47,10 @@ public class WasmOtoroshiTests {
                 .pushInts(2, 3);
 
             Results result = addPlugin.call("add", params, 1);
+            System.out.println(result.getValue(0).v.i32);
             assertEquals(result.getValue(0).v.i32, 5);
 
             addPlugin.freeResults(result);
-//            addPlugin.free();
         });
 
         addPlugin.free();

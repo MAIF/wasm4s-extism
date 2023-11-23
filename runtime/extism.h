@@ -60,8 +60,6 @@ typedef struct ExtismCurrentPlugin ExtismCurrentPlugin;
 
 typedef struct ExtismFunction ExtismFunction;
 
-typedef struct ExtismMemory ExtismMemory;
-
 /**
  * Plugin contains everything needed to execute a WASM function
  */
@@ -79,6 +77,7 @@ typedef union {
 
 /**
  * `ExtismVal` holds the type and value of a function argument/return
+ * TODO - ADDED
  */
 typedef struct {
   ExtismValType t;
@@ -103,39 +102,12 @@ typedef void (*ExtismFunctionType)(ExtismCurrentPlugin *plugin,
 
 void wasm_otoroshi_deallocate_results(ExtismVal *ptr, uintptr_t len);
 
-ExtismVal *wasm_otoroshi_call(WasmPlugin *instance_ptr,
+ExtismVal *wasm_otoroshi_call(ExtismPlugin *plugin,
                               const char *func_name,
                               const ExtismVal *params,
                               ExtismSize n_params);
 
-ExtismVal *wasm_otoroshi_wasm_plugin_call_without_params(WasmPlugin *plugin_ptr,
-                                                         const char *func_name);
-
-void wasm_otoroshi_wasm_plugin_call_without_results(WasmPlugin *plugin_ptr,
-                                                    const char *func_name,
-                                                    const ExtismVal *params,
-                                                    ExtismSize n_params);
-
-ExtismMemory *wasm_otoroshi_create_wasmtime_memory(const char *name,
-                                                   const char *namespace_,
-                                                   uint32_t min_pages,
-                                                   uint32_t max_pages);
-
-void wasm_otoroshi_free_memory(ExtismMemory *mem);
-
-/**
- * Remove all plugins from the registry
- */
-void wasm_otoroshi_extism_reset(WasmPlugin *instance_ptr);
-
-int8_t wasm_otoroshi_extism_memory_write_bytes(WasmPlugin *instance_ptr,
-                                               const uint8_t *data,
-                                               ExtismSize data_size,
-                                               uint32_t offset);
-
-uint8_t *wasm_otoroshi_extism_get_memory(WasmPlugin *instance_ptr, const char *name);
-
-uintptr_t wasm_otoroshi_extism_memory_bytes(WasmPlugin *instance_ptr);
+uint8_t *wasm_otoroshi_extism_get_memory(ExtismPlugin *plugin, const char *name);
 
 /**
  * Get a plugin's ID, the returned bytes are a 16 byte buffer that represent a UUIDv4
