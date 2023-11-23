@@ -1,58 +1,52 @@
 package org.extism.sdk.wasmotoroshi;
 
 import com.sun.jna.Pointer;
-import com.sun.jna.PointerType;
+import org.extism.sdk.HostFunction;
+import org.extism.sdk.LibExtism;
+import org.extism.sdk.Plugin;
+import org.extism.sdk.manifest.Manifest;
 
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class WasmOtoroshiInstance extends PointerType implements AutoCloseable {
+public class WasmOtoroshiInstance extends Plugin {
 
     private AtomicBoolean closed = new AtomicBoolean(false);
 
-    public String extismCall(String functionName, byte[] inputData) {
-        if(!closed.get()) {
-            int inputDataLength = inputData == null ? 0 : inputData.length;
-            int exitCode = WasmBridge.INSTANCE.wasm_otoroshi_bridge_extism_plugin_call(this, functionName, inputData, inputDataLength);
-
-            if (exitCode == -1) {
-                return String.valueOf(exitCode);
-            }
-
-            int length = WasmBridge.INSTANCE.wasm_otoroshi_bridge_extism_plugin_output_length(this);
-            Pointer output = WasmBridge.INSTANCE.wasm_otoroshi_bridge_extism_plugin_output_data(this);
-            return new String(output.getByteArray(0, length), StandardCharsets.UTF_8);
-        }
-        return "";
+    public WasmOtoroshiInstance(byte[] manifestBytes, boolean withWASI, HostFunction[] functions, LinearMemory[] memories) {
+        super(manifestBytes, withWASI, functions, memories);
     }
 
-    public WasmOtoroshiResults call(String functionName, WasmOtoroshiParameters params, int resultsLength) {
+    public WasmOtoroshiInstance(byte[] manifestBytes, boolean withWASI, HostFunction[] functions) {
+        super(manifestBytes, withWASI, functions);
+    }
+
+    public WasmOtoroshiInstance(Manifest manifest, boolean withWASI, HostFunction[] functions) {
+        super(manifest, withWASI, functions);
+    }
+
+    public Results call(String functionName, Parameters params, int resultsLength) {
         if(!closed.get()) {
             params.getPtr().write();
 
-            WasmBridge.ExtismVal.ByReference results = WasmBridge.INSTANCE.wasm_otoroshi_call(
-                    this,
+            LibExtism.ExtismVal.ByReference results = LibExtism.INSTANCE.wasm_otoroshi_call(
+                    this.pluginPointer,
                     functionName,
                     params.getPtr(),
                     params.getLength());
 
             if (results == null) {
-                return new WasmOtoroshiResults(0);
+                return new Results(0);
             } else {
-                return new WasmOtoroshiResults(results, resultsLength);
+                return new Results(results, resultsLength);
             }
         }
         return null;
     }
 
-    public Pointer getCustomData() {
-        return WasmBridge.INSTANCE.get_custom_data(this.getPointer());
-    }
-
     public Pointer callWithoutParams(String functionName, int resultsLength) {
         if(!closed.get()) {
-            Pointer results = WasmBridge.INSTANCE.wasm_otoroshi_wasm_plugin_call_without_params(
-                    this,
+            Pointer results = LibExtism.INSTANCE.wasm_otoroshi_wasm_plugin_call_without_params(
+                    this.pluginPointer,
                     functionName);
 
 
@@ -69,49 +63,39 @@ public class WasmOtoroshiInstance extends PointerType implements AutoCloseable {
         return null;
     }
 
-    public void callWithoutResults(String functionName, WasmOtoroshiParameters params) {
+    public void callWithoutResults(String functionName, Parameters params) {
         if(!closed.get()) {
             params.getPtr().write();
 
-            WasmBridge.INSTANCE.wasm_otoroshi_wasm_plugin_call_without_results(
-                    this,
+            LibExtism.INSTANCE.wasm_otoroshi_wasm_plugin_call_without_results(
+                    this.pluginPointer,
                     functionName,
                     params.getPtr(),
                     params.getLength());
         }
     }
 
-    public void freeResults(WasmOtoroshiResults results) {
-        WasmBridge.INSTANCE.wasm_otoroshi_deallocate_results(results.getPtr(), results.getLength());
+    public void freeResults(Results results) {
+        LibExtism.INSTANCE.wasm_otoroshi_deallocate_results(results.getPtr(), results.getLength());
     }
 
     public int writeBytes(byte[] data, int n, int offset) {
         if(!closed.get()) {
-            return WasmBridge.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this, data, n, offset);
+            return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset);
         }
         return -1;
     }
 
     public Pointer getMemory(String name) {
-        return WasmBridge.INSTANCE.wasm_otoroshi_extism_get_memory(this.getPointer(), name);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pluginPointer, name);
     }
 
     public void reset() {
-        WasmBridge.INSTANCE.wasm_otoroshi_extism_reset(this);
-    }
-
-    public String getError() {
-        return WasmBridge.INSTANCE.wasm_otoroshi_instance_error(this);
-    }
-
-    public void free() {
-        if(!closed.compareAndSet(false, true)) {
-            WasmBridge.INSTANCE.wasm_otoroshi_free_plugin(this);
-        }
+        LibExtism.INSTANCE.wasm_otoroshi_extism_reset(this.pluginPointer);
     }
 
     public int getMemorySize() {
-        return WasmBridge.INSTANCE.wasm_otoroshi_extism_memory_bytes(this);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_bytes(this.pluginPointer);
     }
 
     @Override

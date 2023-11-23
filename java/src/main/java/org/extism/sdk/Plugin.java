@@ -4,8 +4,9 @@ import com.sun.jna.Pointer;
 import org.extism.sdk.manifest.Manifest;
 import org.extism.sdk.support.JsonSerde;
 
-import org.extism.sdk.Parameters;
-import org.extism.sdk.Results;
+import org.extism.sdk.wasmotoroshi.LinearMemory;
+import org.extism.sdk.wasmotoroshi.Parameters;
+import org.extism.sdk.wasmotoroshi.Results;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
@@ -18,8 +19,37 @@ public class Plugin implements AutoCloseable {
     /**
      * Holds the Extism plugin pointer
      */
-    private final Pointer pluginPointer;
+    protected final Pointer pluginPointer;
 
+    public Plugin(byte[] manifestBytes,
+                  boolean withWASI,
+                  HostFunction[] functions) {
+
+        Objects.requireNonNull(manifestBytes, "manifestBytes");
+
+        Pointer[] functionsPtr = HostFunction.arrayToPointer(functions);
+
+        Pointer[] errormsg = new Pointer[1];
+        Pointer p = LibExtism.INSTANCE.extism_plugin_new(manifestBytes,
+                manifestBytes.length,
+                functionsPtr,
+                functions == null ? 0 : functions.length,
+                withWASI,
+                errormsg
+        );
+
+        if (p == null) {
+            int errlen = LibExtism.INSTANCE.strlen(errormsg[0]);
+            byte[] msg = new byte[errlen];
+            errormsg[0].read(0, msg, 0, errlen);
+            LibExtism.INSTANCE.extism_plugin_new_error_free(errormsg[0]);
+            throw new ExtismException(new String(msg));
+        }
+
+        this.pluginPointer = p;
+    }
+
+    // TODO - ADDED
     public Plugin(byte[] manifestBytes,
                   boolean withWASI,
                   HostFunction[] functions,
@@ -31,13 +61,13 @@ public class Plugin implements AutoCloseable {
         Pointer[] memoriesPtr = LinearMemory.arrayToPointer(memories);
 
         Pointer[] errormsg = new Pointer[1];
-        Pointer p = LibExtism.INSTANCE.extism_plugin_new(manifestBytes,
+        Pointer p = LibExtism.INSTANCE.extism_plugin_new_with_memories(manifestBytes,
                 manifestBytes.length,
                 functionsPtr,
                 functions == null ? 0 : functions.length,
-                withWASI,
                 memoriesPtr,
                 memories == null ? 0 : memories.length,
+                withWASI,
                 errormsg
         );
 
@@ -53,12 +83,7 @@ public class Plugin implements AutoCloseable {
     }
 
     public Plugin(Manifest manifest, boolean withWASI, HostFunction[] functions) {
-        this(serialize(manifest), withWASI, functions, null);
-    }
-
-
-    public Plugin(Manifest manifest, boolean withWASI, HostFunction[] functions, LinearMemory[] memories) {
-        this(serialize(manifest), withWASI, functions, memories);
+        this(serialize(manifest), withWASI, functions);
     }
 
     private static byte[] serialize(Manifest manifest) {

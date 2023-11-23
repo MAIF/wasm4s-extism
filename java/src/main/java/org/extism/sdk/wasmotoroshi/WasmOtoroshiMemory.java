@@ -1,6 +1,7 @@
 package org.extism.sdk.wasmotoroshi;
 
 import com.sun.jna.PointerType;
+import org.extism.sdk.LibExtism;
 
 public class WasmOtoroshiMemory extends PointerType implements AutoCloseable {
 
@@ -12,7 +13,7 @@ public class WasmOtoroshiMemory extends PointerType implements AutoCloseable {
     public WasmOtoroshiMemory() {}
 
     public WasmOtoroshiMemory(String name, String namespace, int minPages, int maxPages) {
-        super(WasmBridge.INSTANCE.wasm_otoroshi_create_wasmtime_memory(
+        super(LibExtism.INSTANCE.wasm_otoroshi_create_wasmtime_memory(
                 name,
                 namespace,
                 minPages,
@@ -26,6 +27,6 @@ public class WasmOtoroshiMemory extends PointerType implements AutoCloseable {
 
     @Override
     public void close() {
-        WasmBridge.INSTANCE.wasm_otoroshi_free_memory(this);
+        LibExtism.INSTANCE.wasm_otoroshi_free_memory(this);
     }
 }

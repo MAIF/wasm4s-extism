@@ -1,4 +1,6 @@
-package org.extism.sdk;
+package org.extism.sdk.wasmotoroshi;
+
+import org.extism.sdk.LibExtism;
 
 public class Results extends Parameters implements AutoCloseable {
 

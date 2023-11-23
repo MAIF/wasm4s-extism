@@ -1,7 +1,7 @@
-package org.extism.sdk;
+package org.extism.sdk.wasmotoroshi;
 
 import com.sun.jna.Pointer;
-import com.sun.jna.PointerType;
+import org.extism.sdk.LibExtism;
 
 public class LinearMemory {
 

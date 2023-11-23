@@ -1,4 +1,4 @@
-package org.extism.sdk;
+package org.extism.sdk.wasmotoroshi;
 
 import java.util.Optional;
 

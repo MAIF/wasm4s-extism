@@ -44,7 +44,7 @@ public class Extism {
         try (var plugin = new Plugin(manifest, false, null)) {
             return plugin.call(function, input);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new ExtismException(e.getMessage());
         }
     }
 

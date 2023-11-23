@@ -1,4 +1,6 @@
-package org.extism.sdk;
+package org.extism.sdk.wasmotoroshi;
+
+import org.extism.sdk.LibExtism;
 
 public class Parameters implements AutoCloseable {
     protected LibExtism.ExtismVal.ByReference ptr;
