@@ -22,6 +22,20 @@ fn extism_length<T>(mut store: &mut wasmtime::Store<T>, instance: &mut Instance,
     out[0].unwrap_i64() as u64
 }
 
+fn extism_length_unsafe<T>(
+    mut store: &mut wasmtime::Store<T>,
+    instance: &mut Instance,
+    p: u64,
+) -> u64 {
+    let out = &mut [Val::I64(0)];
+    instance
+        .get_func(&mut store, "length_unsafe")
+        .unwrap()
+        .call(&mut store, &[Val::I64(p as i64)], out)
+        .unwrap();
+    out[0].unwrap_i64() as u64
+}
+
 fn extism_load_u8<T>(mut store: &mut wasmtime::Store<T>, instance: &mut Instance, p: u64) -> u8 {
     let out = &mut [Val::I32(0)];
     instance
@@ -173,6 +187,7 @@ fn test_kernel_allocations() {
     let first_alloc = p;
     assert!(p > 0);
     assert_eq!(extism_length(&mut store, instance, p), 1);
+    assert_eq!(extism_length_unsafe(&mut store, instance, p), 1);
     extism_free(&mut store, instance, p);
 
     // 2 bytes
@@ -180,24 +195,31 @@ fn test_kernel_allocations() {
     assert!(x > 0);
     assert!(x != p);
     assert_eq!(extism_length(&mut store, instance, x), 2);
+    assert_eq!(extism_length_unsafe(&mut store, instance, x), 2);
     extism_free(&mut store, instance, x);
 
     for i in 0..64 {
         let p = extism_alloc(&mut store, instance, 64 - i);
         assert!(p > 0);
         assert_eq!(extism_length(&mut store, instance, p), 64 - i);
+        assert_eq!(extism_length_unsafe(&mut store, instance, p), 64 - i);
         extism_free(&mut store, instance, p);
 
         // should re-use the last allocation
         let q = extism_alloc(&mut store, instance, 64 - i);
         assert_eq!(p, q);
         assert_eq!(extism_length(&mut store, instance, q), 64 - i);
+        assert_eq!(extism_length_unsafe(&mut store, instance, q), 64 - i);
         extism_free(&mut store, instance, q);
     }
 
     // 512 bytes, test block re-use + splitting
     let p = extism_alloc(&mut store, instance, 512);
     assert_eq!(extism_length(&mut store, instance, p), 512);
+    assert_eq!(extism_length(&mut store, instance, p + 1), 0);
+    assert_eq!(extism_length(&mut store, instance, p + 2), 0);
+    assert_eq!(extism_length(&mut store, instance, p + 3), 0);
+    assert_eq!(extism_length(&mut store, instance, p + 4), 0);
     extism_free(&mut store, instance, p);
 
     // 128 bytes, should be split off the 512 byte block
@@ -210,7 +232,7 @@ fn test_kernel_allocations() {
     let r = extism_alloc(&mut store, instance, 128);
     assert!(p <= r && r < p + 512);
     assert!(r > p);
-    assert_eq!(extism_length(&mut store, instance, q), 128);
+    assert_eq!(extism_length(&mut store, instance, r), 128);
     extism_free(&mut store, instance, q);
 
     // 100 pages
@@ -262,8 +284,8 @@ fn test_load_store() {
 
     let mut buf = [0u8; 8];
 
-    for i in 0..8 {
-        buf[i] = extism_load_u8(&mut store, instance, p + i as u64);
+    for (i, b) in buf.iter_mut().enumerate() {
+        *b = extism_load_u8(&mut store, instance, p + i as u64);
     }
     assert_eq!(u64::from_le_bytes(buf), 999);
 

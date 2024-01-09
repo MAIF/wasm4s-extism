@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 pub type ManifestMemory = MemoryOptions;
 
 /// Configure memory settings
-#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MemoryOptions {
@@ -15,7 +15,7 @@ pub struct MemoryOptions {
 }
 
 /// Generic HTTP request structure
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HttpRequest {
@@ -55,7 +55,7 @@ impl HttpRequest {
 }
 
 /// Provides additional metadata about a Webassembly module
-#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct WasmMetadata {
@@ -97,7 +97,7 @@ impl From<Vec<u8>> for Wasm {
 pub type ManifestWasm = Wasm;
 
 /// The `Wasm` type specifies how to access a WebAssembly module
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 #[serde(deny_unknown_fields)]
@@ -181,6 +181,18 @@ impl Wasm {
             Wasm::Url { req: _, meta } => meta,
         }
     }
+
+    /// Update Wasm module name
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.meta_mut().name = Some(name.into());
+        self
+    }
+
+    /// Update Wasm module hash
+    pub fn with_hash(mut self, hash: impl Into<String>) -> Self {
+        self.meta_mut().hash = Some(hash.into());
+        self
+    }
 }
 
 #[cfg(feature = "json_schema")]
@@ -192,7 +204,7 @@ fn base64_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::
 }
 
 /// The `Manifest` type is used to configure the runtime and specify how to load modules.
-#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json_schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
@@ -219,12 +231,8 @@ pub struct Manifest {
     pub allowed_paths: Option<BTreeMap<PathBuf, PathBuf>>,
 
     /// The plugin timeout, by default this is set to 30s
-    #[serde(default = "default_timeout")]
+    #[serde(default)]
     pub timeout_ms: Option<u64>,
-}
-
-fn default_timeout() -> Option<u64> {
-    Some(30000)
 }
 
 impl Manifest {
@@ -232,9 +240,13 @@ impl Manifest {
     pub fn new(wasm: impl IntoIterator<Item = impl Into<Wasm>>) -> Manifest {
         Manifest {
             wasm: wasm.into_iter().map(|x| x.into()).collect(),
-            timeout_ms: default_timeout(),
             ..Default::default()
         }
+    }
+
+    pub fn with_wasm(mut self, wasm: impl Into<Wasm>) -> Self {
+        self.wasm.push(wasm.into());
+        self
     }
 
     /// Disallow HTTP requests to all hosts
@@ -329,7 +341,7 @@ mod base64 {
     use serde::{Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(v: &Vec<u8>, s: S) -> Result<S::Ok, S::Error> {
-        let base64 = general_purpose::STANDARD.encode(v);
+        let base64 = general_purpose::STANDARD.encode(v.as_slice());
         String::serialize(&base64, s)
     }
 

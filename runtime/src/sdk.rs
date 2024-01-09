@@ -42,6 +42,9 @@ pub type ExtismFunctionType = extern "C" fn(
     data: *mut std::ffi::c_void,
 );
 
+/// Log drain callback
+pub type ExtismLogDrainFunctionType = extern "C" fn(data: *const std::ffi::c_char, size: Size);
+
 impl From<&wasmtime::Val> for ExtismVal {
     fn from(value: &wasmtime::Val) -> Self {
         match value.ty() {
@@ -600,7 +603,7 @@ fn set_log_file(log_file: impl Into<std::path::PathBuf>, filter: &str) -> Result
         let x = tracing_subscriber::EnvFilter::builder()
             .with_default_directive(tracing::Level::ERROR.into());
         if is_level {
-            x.parse_lossy(&format!("extism={}", filter))
+            x.parse_lossy(format!("extism={}", filter))
         } else {
             x.parse_lossy(filter)
         }
@@ -654,7 +657,7 @@ unsafe fn set_log_buffer(filter: &str) -> Result<(), Error> {
         let x = tracing_subscriber::EnvFilter::builder()
             .with_default_directive(tracing::Level::ERROR.into());
         if is_level {
-            x.parse_lossy(&format!("extism={}", filter))
+            x.parse_lossy(format!("extism={}", filter))
         } else {
             x.parse_lossy(filter)
         }
@@ -671,11 +674,11 @@ unsafe fn set_log_buffer(filter: &str) -> Result<(), Error> {
 #[no_mangle]
 /// Calls the provided callback function for each buffered log line.
 /// This is only needed when `extism_log_custom` is used.
-pub unsafe extern "C" fn extism_log_drain(handler: extern "C" fn(*const std::ffi::c_char, usize)) {
+pub unsafe extern "C" fn extism_log_drain(handler: ExtismLogDrainFunctionType) {
     if let Some(buf) = &mut LOG_BUFFER {
         if let Ok(mut buf) = buf.buffer.lock() {
             for (line, len) in buf.drain(..) {
-                handler(line.as_ptr(), len);
+                handler(line.as_ptr(), len as u64);
             }
         }
     }
@@ -703,6 +706,30 @@ impl std::io::Write for LogBuffer {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
+    }
+}
+
+/// Reset the Extism runtime, this will invalidate all allocated memory
+#[no_mangle]
+pub unsafe extern "C" fn extism_plugin_reset(plugin: *mut Plugin) -> bool {
+    let plugin = &mut *plugin;
+
+    if let Err(e) = plugin.reset() {
+        error!(
+            plugin = plugin.id.to_string(),
+            "unable to reset plugin: {}",
+            e.to_string()
+        );
+        if let Err(e) = plugin.current_plugin_mut().set_error(e.to_string()) {
+            error!(
+                plugin = plugin.id.to_string(),
+                "unable to set error after failed plugin reset: {}",
+                e.to_string()
+            );
+        }
+        false
+    } else {
+        true
     }
 }
 

@@ -39,7 +39,7 @@
 use core::sync::atomic::*;
 
 pub type Pointer = u64;
-pub type Length = u64;
+pub type Handle = u64;
 
 /// WebAssembly page size
 const PAGE_SIZE: usize = 65536;
@@ -81,13 +81,13 @@ pub struct MemoryRoot {
     /// Offset of error block
     pub error: AtomicU64,
     /// Input position in memory
-    pub input_offset: Pointer,
+    pub input_offset: Handle,
     /// Input length
-    pub input_length: Length,
+    pub input_length: u64,
     /// Output position in memory
     pub output_offset: Pointer,
     /// Output length
-    pub output_length: Length,
+    pub output_length: u64,
     /// A pointer to the start of the first block
     pub blocks: [MemoryBlock; 0],
 }
@@ -139,7 +139,9 @@ impl MemoryRoot {
         }
 
         // Ensure that at least one page is allocated to store the `MemoryRoot` data
-        if core::arch::wasm32::memory_size(0) == 0 && core::arch::wasm32::memory_grow(0, 1) == usize::MAX {
+        if core::arch::wasm32::memory_size(0) == 0
+            && core::arch::wasm32::memory_grow(0, 1) == usize::MAX
+        {
             core::arch::wasm32::unreachable()
         }
 
@@ -168,12 +170,15 @@ impl MemoryRoot {
 
     /// Resets the position of the allocator and zeroes out all allocations
     pub unsafe fn reset(&mut self) {
+        // Clear allocated data
+        let self_position = self.position.fetch_and(0, Ordering::SeqCst);
         core::ptr::write_bytes(
             self.blocks.as_mut_ptr() as *mut u8,
-            0,
-            self.length.load(Ordering::Acquire) as usize,
+            MemoryStatus::Unused as u8,
+            self_position as usize,
         );
-        self.position.store(0, Ordering::Release);
+
+        // Clear extism runtime metadata
         self.error.store(0, Ordering::Release);
         self.input_offset = 0;
         self.input_length = 0;
@@ -201,7 +206,7 @@ impl MemoryRoot {
     // is used to avoid loading the allocators position more than once when performing an allocation.
     unsafe fn find_free_block(
         &mut self,
-        length: Length,
+        length: u64,
         self_position: u64,
     ) -> Option<&'static mut MemoryBlock> {
         // Get the first block
@@ -247,7 +252,7 @@ impl MemoryRoot {
 
     /// Create a new `MemoryBlock`, when `Some(block)` is returned, `block` will contain at least enough room for `length` bytes
     /// but may be as large as `length` + `BLOCK_SPLIT_SIZE` bytes. When `None` is returned the allocation has failed.
-    pub unsafe fn alloc(&mut self, length: Length) -> Option<&'static mut MemoryBlock> {
+    pub unsafe fn alloc(&mut self, length: u64) -> Option<&'static mut MemoryBlock> {
         let self_position = self.position.load(Ordering::Acquire);
         let self_length = self.length.load(Ordering::Acquire);
         let b = self.find_free_block(length, self_position);
@@ -301,9 +306,26 @@ impl MemoryRoot {
         if !Self::pointer_in_bounds_fast(offs) {
             return None;
         }
-        let ptr = offs - core::mem::size_of::<MemoryBlock>() as u64;
-        let ptr = ptr as *mut MemoryBlock;
-        Some(&mut *ptr)
+
+        // Get the first block
+        let mut block = self.blocks.as_mut_ptr();
+
+        // Only loop while the block pointer is less then the current position
+        while (block as u64) < self.blocks.as_ptr() as u64 + offs {
+            let b = &mut *block;
+
+            // Get the block status, this lets us know if we are able to re-use it
+            let status = b.status.load(Ordering::Acquire);
+
+            if status == MemoryStatus::Active as u8 && b.data.as_ptr() as Pointer == offs {
+                return Some(b);
+            }
+
+            // Get the next block
+            block = b.next_ptr();
+        }
+
+        None
     }
 }
 
@@ -328,21 +350,21 @@ impl MemoryBlock {
 
 /// Allocate a block of memory and return the offset
 #[no_mangle]
-pub unsafe fn alloc(n: Length) -> Pointer {
+pub unsafe fn alloc(n: u64) -> Handle {
     if n == 0 {
         return 0;
     }
     let region = MemoryRoot::new();
     let block = region.alloc(n);
     match block {
-        Some(block) => block.data.as_mut_ptr() as Pointer,
+        Some(block) => block.data.as_mut_ptr() as Handle,
         None => 0,
     }
 }
 
 /// Free allocated memory
 #[no_mangle]
-pub unsafe fn free(p: Pointer) {
+pub unsafe fn free(p: Handle) {
     if p == 0 {
         return;
     }
@@ -360,13 +382,42 @@ pub unsafe fn free(p: Pointer) {
 }
 
 /// Get the length of an allocated memory block
+///
+/// Note: this should only be called on memory handles returned
+/// by a call to `alloc` - it will return garbage on invalid offsets
 #[no_mangle]
-pub unsafe fn length(p: Pointer) -> Length {
+pub unsafe fn length_unsafe(p: Handle) -> u64 {
     if p == 0 {
         return 0;
     }
+
+    if !MemoryRoot::pointer_in_bounds_fast(p) {
+        return 0;
+    }
+
+    let ptr = p - core::mem::size_of::<MemoryBlock>() as u64;
+    let block = &mut *(ptr as *mut MemoryBlock);
+
+    // Simplest sanity check to verify the pointer is a block
+    if block.status.load(Ordering::Acquire) != MemoryStatus::Active as u8 {
+        return 0;
+    }
+
+    block.used as u64
+}
+
+/// Get the length but returns 0 if the offset is not a valid handle.
+///
+/// Note: this function walks each node in the allocations list, which ensures correctness, but is also
+/// slow
+#[no_mangle]
+pub unsafe fn length(p: Pointer) -> u64 {
+    if p == 0 {
+        return 0;
+    }
+
     if let Some(block) = MemoryRoot::new().find_block(p) {
-        block.used as Length
+        block.used as u64
     } else {
         0
     }
@@ -394,24 +445,24 @@ pub unsafe fn load_u64(p: Pointer) -> u64 {
 
 /// Load a byte from the input data
 #[no_mangle]
-pub unsafe fn input_load_u8(p: Pointer) -> u8 {
+pub unsafe fn input_load_u8(offset: u64) -> u8 {
     let root = MemoryRoot::new();
     #[cfg(feature = "bounds-checking")]
-    if p >= root.input_length {
+    if offset >= root.input_length {
         return 0;
     }
-    *((root.input_offset + p) as *mut u8)
+    *((root.input_offset + offset) as *mut u8)
 }
 
 /// Load a u64 from the input data
 #[no_mangle]
-pub unsafe fn input_load_u64(p: Pointer) -> u64 {
+pub unsafe fn input_load_u64(offset: u64) -> u64 {
     let root = MemoryRoot::new();
     #[cfg(feature = "bounds-checking")]
-    if p + core::mem::size_of::<u64>() as Pointer > root.input_length {
+    if offset + core::mem::size_of::<u64>() as u64 > root.input_length {
         return 0;
     }
-    *((root.input_offset + p) as *mut u64)
+    *((root.input_offset + offset) as *mut u64)
 }
 
 /// Write a byte in Extism-managed memory
@@ -435,22 +486,24 @@ pub unsafe fn store_u64(p: Pointer, x: u64) {
 }
 
 /// Set the range of the input data in memory
+/// h must always be a handle so that length works on it
+/// len must match length(handle)
 #[no_mangle]
-pub unsafe fn input_set(p: Pointer, len: Length) {
+pub unsafe fn input_set(h: Handle, len: u64) {
     let root = MemoryRoot::new();
     #[cfg(feature = "bounds-checking")]
     {
-        if !root.pointer_in_bounds(p) || !root.pointer_in_bounds(p + len - 1) {
+        if !root.pointer_in_bounds(h) || !root.pointer_in_bounds(h + len - 1) {
             return;
         }
     }
-    root.input_offset = p;
+    root.input_offset = h;
     root.input_length = len;
 }
 
 /// Set the range of the output data in memory
 #[no_mangle]
-pub unsafe fn output_set(p: Pointer, len: Length) {
+pub unsafe fn output_set(p: Pointer, len: u64) {
     let root = MemoryRoot::new();
     #[cfg(feature = "bounds-checking")]
     {
@@ -464,25 +517,25 @@ pub unsafe fn output_set(p: Pointer, len: Length) {
 
 /// Get the input length
 #[no_mangle]
-pub fn input_length() -> Length {
+pub fn input_length() -> u64 {
     unsafe { MemoryRoot::new().input_length }
 }
 
 /// Get the input offset in Exitsm-managed memory
 #[no_mangle]
-pub fn input_offset() -> Length {
+pub fn input_offset() -> Handle {
     unsafe { MemoryRoot::new().input_offset }
 }
 
 /// Get the output length
 #[no_mangle]
-pub fn output_length() -> Length {
+pub fn output_length() -> u64 {
     unsafe { MemoryRoot::new().output_length }
 }
 
 /// Get the output offset in Extism-managed memory
 #[no_mangle]
-pub unsafe fn output_offset() -> Length {
+pub unsafe fn output_offset() -> Pointer {
     MemoryRoot::new().output_offset
 }
 
@@ -494,30 +547,30 @@ pub unsafe fn reset() {
 
 /// Set the error message offset
 #[no_mangle]
-pub unsafe fn error_set(ptr: Pointer) {
+pub unsafe fn error_set(h: Handle) {
     let root = MemoryRoot::new();
 
     // Allow ERROR to be set to 0
-    if ptr == 0 {
-        root.error.store(ptr, Ordering::SeqCst);
+    if h == 0 {
+        root.error.store(h, Ordering::SeqCst);
         return;
     }
 
     #[cfg(feature = "bounds-checking")]
-    if !root.pointer_in_bounds(ptr) {
+    if !root.pointer_in_bounds(h) {
         return;
     }
-    root.error.store(ptr, Ordering::SeqCst);
+    root.error.store(h, Ordering::SeqCst);
 }
 
 /// Get the error message offset, if it's `0` then no error has been set
 #[no_mangle]
-pub unsafe fn error_get() -> Pointer {
+pub unsafe fn error_get() -> Handle {
     MemoryRoot::new().error.load(Ordering::SeqCst)
 }
 
 /// Get the position of the allocator, this can be used as an indication of how many bytes are currently in-use
 #[no_mangle]
-pub unsafe fn memory_bytes() -> Length {
+pub unsafe fn memory_bytes() -> u64 {
     MemoryRoot::new().length.load(Ordering::Acquire)
 }

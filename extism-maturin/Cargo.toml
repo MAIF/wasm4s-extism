@@ -1,14 +1,20 @@
 [package]
 name = "extism-sys"
-version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+version.workspace = true
+# Explicitly omit authors from this package since our Cargo "authors" are
+# incompatible with PyPI's requirements.
+# authors.workspace = true
 
 [lib]
 name = "extism_sys"
 crate-type = ["cdylib"]
 
 [dependencies]
-extism = {path = "../runtime"}
+extism = { workspace = true }
 
 [build-dependencies]
 cc = "1"

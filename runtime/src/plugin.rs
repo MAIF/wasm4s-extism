@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::*;
 
@@ -6,6 +6,7 @@ use crate::*;
 // pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
 pub const EXTISM_ENV_MODULE: &str = "env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
+pub(crate) const MAIN_KEY: &str = "main";
 
 #[derive(Default, Clone)]
 pub(crate) struct Output {
@@ -75,7 +76,7 @@ pub struct Plugin {
 
     /// Set to `true` when de-initializarion may have occured (i.e.a call to `_start`),
     /// in this case we need to re-initialize the entire module.
-    pub(crate) needs_reset: bool,
+    pub(crate) store_needs_reset: bool,
 
     pub(crate) debug_options: DebugOptions,
 }
@@ -111,7 +112,7 @@ impl Internal for Plugin {
     }
 }
 
-fn profiling_strategy() -> ProfilingStrategy {
+pub(crate) fn profiling_strategy() -> ProfilingStrategy {
     match std::env::var("EXTISM_PROFILE").as_deref() {
         Ok("perf") => ProfilingStrategy::PerfMap,
         Ok("jitdump") => ProfilingStrategy::JitDump,
@@ -124,55 +125,111 @@ fn profiling_strategy() -> ProfilingStrategy {
     }
 }
 
-pub trait WasmInput<'a>: Into<std::borrow::Cow<'a, [u8]>> {}
+/// Defines an input type for Wasm data.
+///
+/// Types that implement `Into<WasmInput>` can be passed directly into `Plugin::new`
+pub enum WasmInput<'a> {
+    /// Raw Wasm module
+    Data(std::borrow::Cow<'a, [u8]>),
+    /// Owned manifest
+    Manifest(Manifest),
+    /// Borrowed manifest
+    ManifestRef(&'a Manifest),
+}
 
-impl<'a> WasmInput<'a> for Manifest {}
-impl<'a> WasmInput<'a> for &Manifest {}
-impl<'a> WasmInput<'a> for &'a [u8] {}
-impl<'a> WasmInput<'a> for Vec<u8> {}
+impl<'a> From<Manifest> for WasmInput<'a> {
+    fn from(value: Manifest) -> Self {
+        WasmInput::Manifest(value)
+    }
+}
+
+impl<'a> From<&'a Manifest> for WasmInput<'a> {
+    fn from(value: &'a Manifest) -> Self {
+        WasmInput::ManifestRef(value)
+    }
+}
+
+impl<'a> From<&'a mut Manifest> for WasmInput<'a> {
+    fn from(value: &'a mut Manifest) -> Self {
+        WasmInput::ManifestRef(value)
+    }
+}
+
+impl<'a> From<&'a [u8]> for WasmInput<'a> {
+    fn from(value: &'a [u8]) -> Self {
+        WasmInput::Data(value.into())
+    }
+}
+
+impl<'a> From<&'a str> for WasmInput<'a> {
+    fn from(value: &'a str) -> Self {
+        WasmInput::Data(value.as_bytes().into())
+    }
+}
+
+impl<'a> From<Vec<u8>> for WasmInput<'a> {
+    fn from(value: Vec<u8>) -> Self {
+        WasmInput::Data(value.into())
+    }
+}
+
+impl<'a> From<&'a Vec<u8>> for WasmInput<'a> {
+    fn from(value: &'a Vec<u8>) -> Self {
+        WasmInput::Data(value.into())
+    }
+}
 
 impl Plugin {
     /// Create a new plugin from a Manifest or WebAssembly module, and host functions. The `with_wasi`
     /// parameter determines whether or not the module should be executed with WASI enabled.
     pub fn new<'a>(
-        wasm: impl WasmInput<'a>,
+        wasm: impl Into<WasmInput<'a>>,
         imports: impl IntoIterator<Item = Function>,
         with_wasi: bool,
     ) -> Result<Plugin, Error> {
-        Self::build_new(wasm.into(), imports, with_wasi, Default::default())
+        Self::build_new(wasm.into(), imports, with_wasi, Default::default(), None)
     }
 
     pub(crate) fn build_new(
-        wasm: impl AsRef<[u8]>,
+        wasm: WasmInput<'_>,
         imports: impl IntoIterator<Item = Function>,
         with_wasi: bool,
-        mut debug_options: DebugOptions,
+        debug_options: DebugOptions,
+        cache_dir: Option<Option<PathBuf>>,
     ) -> Result<Plugin, Error> {
-        // Configure debug options
-        debug_options.debug_info =
-            debug_options.debug_info || std::env::var("EXTISM_DEBUG").is_ok();
-        if let Ok(x) = std::env::var("EXTISM_COREDUMP") {
-            debug_options.coredump = Some(std::path::PathBuf::from(x));
-        };
-        if let Ok(x) = std::env::var("EXTISM_MEMDUMP") {
-            debug_options.memdump = Some(std::path::PathBuf::from(x));
-        };
-        let profiling_strategy = debug_options
-            .profiling_strategy
-            .map_or(ProfilingStrategy::None, |_| profiling_strategy());
-        debug_options.profiling_strategy = Some(profiling_strategy);
-
         // Setup wasmtime types
-        let engine = Engine::new(
-            Config::new()
-                .epoch_interruption(true)
-                .debug_info(debug_options.debug_info)
-                .coredump_on_trap(debug_options.coredump.is_some())
-                .profiler(profiling_strategy)
-                .wasm_tail_call(true)
-                .wasm_function_references(true),
-        )?;
-        let (manifest, modules) = manifest::load(&engine, wasm.as_ref())?;
+        let mut config = Config::new();
+        config
+            .epoch_interruption(true)
+            .debug_info(debug_options.debug_info)
+            .coredump_on_trap(debug_options.coredump.is_some())
+            .profiler(debug_options.profiling_strategy)
+            .wasm_tail_call(true)
+            .wasm_function_references(true);
+
+        match cache_dir {
+            Some(None) => (),
+            Some(Some(path)) => {
+                config.cache_config_load(path)?;
+            }
+            None => {
+                if let Ok(env) = std::env::var("EXTISM_CACHE_CONFIG") {
+                    if !env.is_empty() {
+                        config.cache_config_load(&env)?;
+                    }
+                } else {
+                    config.cache_config_load_default()?;
+                }
+            }
+        }
+
+        let engine = Engine::new(&config)?;
+        let (manifest, modules) = manifest::load(&engine, wasm)?;
+        if modules.len() <= 1 {
+            anyhow::bail!("No wasm modules provided");
+        } else if !modules.contains_key(MAIN_KEY) {
+            anyhow::bail!("No main module provided");
+        }
 
         let available_pages = manifest.memory.max_pages;
         debug!("Available pages: {available_pages:?}");
@@ -194,14 +251,9 @@ impl Plugin {
             })?;
         }
 
-        // Get the `main` module, or the last one if `main` doesn't exist
-        let (main_name, main) = modules.get("main").map(|x| ("main", x)).unwrap_or_else(|| {
-            let entry = modules.iter().last().unwrap();
-            (entry.0.as_str(), entry.1)
-        });
-
+        let main = &modules[MAIN_KEY];
         for (name, module) in modules.iter() {
-            if name != main_name {
+            if name != MAIN_KEY {
                 linker.module(&mut store, name, module)?;
             }
         }
@@ -268,7 +320,7 @@ impl Plugin {
             cancel_handle: CancelHandle { id, timer_tx },
             instantiations: 0,
             output: Output::default(),
-            needs_reset: false,
+            store_needs_reset: false,
             debug_options,
             _functions: imports,
         };
@@ -289,7 +341,7 @@ impl Plugin {
         &mut self,
         instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
     ) -> Result<(), Error> {
-        if self.instantiations > 100 {
+        if self.store_needs_reset {
             let engine = self.store.engine().clone();
             let internal = self.current_plugin_mut();
             self.store = Store::new(
@@ -312,25 +364,17 @@ impl Plugin {
                     .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
             }
 
-            let (main_name, main) = self
-                .modules
-                .get("main")
-                .map(|x| ("main", x))
-                .unwrap_or_else(|| {
-                    let entry = self.modules.iter().last().unwrap();
-                    (entry.0.as_str(), entry.1)
-                });
-
+            let main = &self.modules[MAIN_KEY];
             for (name, module) in self.modules.iter() {
-                if name != main_name {
+                if name != MAIN_KEY {
                     self.linker.module(&mut self.store, name, module)?;
                 }
             }
             self.instantiations = 0;
             self.instance_pre = self.linker.instantiate_pre(main)?;
+            **instance_lock = None;
+            self.store_needs_reset = false;
         }
-
-        **instance_lock = None;
         Ok(())
     }
 
@@ -374,7 +418,7 @@ impl Plugin {
 
     /// Returns `true` if the given function exists, otherwise `false`
     pub fn function_exists(&mut self, function: impl AsRef<str>) -> bool {
-        self.modules["main"]
+        self.modules[MAIN_KEY]
             .get_export(function.as_ref())
             .map(|x| x.func().is_some())
             .unwrap_or(false)
@@ -401,12 +445,7 @@ impl Plugin {
         let bytes = unsafe { std::slice::from_raw_parts(input, len) };
         debug!(plugin = &id, "input size: {}", bytes.len());
 
-        if let Some(f) = self.linker.get(&mut self.store, EXTISM_ENV_MODULE, "reset") {
-            f.into_func().unwrap().call(&mut self.store, &[], &mut [])?;
-        } else {
-            error!(plugin = &id, "call to extism:host/env::reset failed");
-        }
-
+        self.reset()?;
         let handle = self.current_plugin_mut().memory_new(bytes)?;
 
         if let Some(f) = self
@@ -418,6 +457,19 @@ impl Plugin {
                 &[Val::I64(handle.offset() as i64), Val::I64(len as i64)],
                 &mut [],
             )?;
+        }
+
+        Ok(())
+    }
+
+    /// Reset Extism runtime, this will invalidate all allocated memory
+    pub fn reset(&mut self) -> Result<(), Error> {
+        let id = self.id.to_string();
+
+        if let Some(f) = self.linker.get(&mut self.store, EXTISM_ENV_MODULE, "reset") {
+            f.into_func().unwrap().call(&mut self.store, &[], &mut [])?;
+        } else {
+            error!(plugin = &id, "call to extism:host/env::reset failed");
         }
 
         Ok(())
@@ -608,14 +660,11 @@ impl Plugin {
         let name = name.as_ref();
         let input = input.as_ref();
 
-        if self.needs_reset {
-            if let Err(e) = self.reset_store(lock) {
-                error!(
-                    plugin = self.id.to_string(),
-                    "call to Plugin::reset_store failed: {e:?}"
-                );
-            }
-            self.needs_reset = false;
+        if let Err(e) = self.reset_store(lock) {
+            error!(
+                plugin = self.id.to_string(),
+                "call to Plugin::reset_store failed: {e:?}"
+            );
         }
 
         self.instantiate(lock).map_err(|e| (e, -1))?;
@@ -679,7 +728,7 @@ impl Plugin {
         self.store
             .epoch_deadline_callback(|_| Ok(UpdateDeadline::Continue(1)));
         let _ = self.timer_tx.send(TimerAction::Stop { id: self.id });
-        self.needs_reset = name == "_start";
+        self.store_needs_reset = name == "_start";
 
         // Get extism error
         if use_extism {
@@ -834,6 +883,24 @@ impl Plugin {
             .and_then(move |_| self.output())
     }
 
+    /// Similar to `Plugin::call`, but returns the Extism error code along with the
+    /// `Error`. It is assumed if `Ok(_)` is returned that the error code was `0`.
+    ///
+    /// All Extism plugin calls return an error code, `Plugin::call` consumes the error code,
+    /// while `Plugin::call_get_error_code` preserves it - this function should only be used
+    /// when you need to inspect the actual return value of a plugin function when it fails.
+    pub fn call_get_error_code<'a, 'b, T: ToBytes<'a>, U: FromBytes<'b>>(
+        &'b mut self,
+        name: impl AsRef<str>,
+        input: T,
+    ) -> Result<U, (Error, i32)> {
+        let lock = self.instance.clone();
+        let mut lock = lock.lock().unwrap();
+        let data = input.to_bytes().map_err(|e| (e, -1))?;
+        self.raw_call(&mut lock, name, data)
+            .and_then(move |_| self.output().map_err(|e| (e, -1)))
+    }
+
     /// Get a `CancelHandle`, which can be used from another thread to cancel a running plugin
     pub fn cancel_handle(&self) -> CancelHandle {
         self.cancel_handle.clone()
@@ -912,8 +979,8 @@ pub(crate) enum GuestRuntime {
 /// ```
 #[macro_export]
 macro_rules! typed_plugin {
-    ($name:ident {$($f:ident $(< $( $lt:tt $( : $clt:path )? ),+ >)? ($input:ty) -> $output:ty);*$(;)?}) => {
-        pub struct $name(pub $crate::Plugin);
+    ($pub:vis $name:ident {$($f:ident $(< $( $lt:tt $( : $clt:path )? ),+ >)? ($input:ty) -> $output:ty);*$(;)?}) => {
+        $pub struct $name(pub $crate::Plugin);
 
         unsafe impl Send for $name {}
         unsafe impl Sync for $name {}
