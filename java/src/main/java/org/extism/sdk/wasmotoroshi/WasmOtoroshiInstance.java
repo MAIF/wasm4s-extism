@@ -103,7 +103,7 @@ public class WasmOtoroshiInstance extends Plugin {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         if(!closed.compareAndSet(false, true)) {
             free();
         }

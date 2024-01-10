@@ -19,8 +19,8 @@ public class ExtismCurrentPlugin {
         return LibExtism.INSTANCE.extism_current_plugin_memory_alloc(this.pointer, n);
     }
 
-    public Pointer getLinearMemory(int instanceIndex, String memoryName) {
-        return LibExtism.INSTANCE.extism_get_lineary_memory_from_host_functions(this.pointer, instanceIndex, memoryName);
+    public Pointer getLinearMemory(String memoryName) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pointer, memoryName);
     }
 
     public void free(long offset) {

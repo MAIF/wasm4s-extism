@@ -132,53 +132,52 @@ public class PluginTests {
         }
     }
 
-//    @Test
-//    public void shouldAllowInvokeHostFunctionWithoutUserData() throws Exception {
-//
-//        var parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
-//        var resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
-//
-//        ExtismFunction helloWorldFunction = (plugin, params, returns, data) -> {
-//            System.out.println("Hello from Java Host Function!");
-//            System.out.println(String.format("Input string received from plugin, %s", plugin.inputString(params[0])));
-//
-//            int offs = plugin.alloc(4);
-//            Pointer mem = plugin.memory();
-//            mem.write(offs, "test".getBytes(), 0, 4);
-//            returns[0].v.i64 = offs;
-//
-//            assertThat(data.isEmpty());
-//        };
-//
-//
-//        HostFunction f = new HostFunction<>(
-//                "hello_world",
-//                parametersTypes,
-//                resultsTypes,
-//                helloWorldFunction,
-//                Optional.empty()
-//        )
-//                .withNamespace("env");
-//
-//        HostFunction g = new HostFunction<>(
-//                "hello_world",
-//                parametersTypes,
-//                resultsTypes,
-//                helloWorldFunction,
-//                Optional.empty()
-//        )
-//                .withNamespace("test");
-//
-//        HostFunction[] functions = {f,g};
-//
-//        Manifest manifest = new Manifest(Arrays.asList(CODE.pathWasmFunctionsSource()));
-//        String functionName = "count_vowels";
-//
-//        try (var plugin = new Plugin(manifest, true, functions)) {
-//            var output = plugin.call(functionName, "this is a test");
-//            assertThat(output).isEqualTo("test");
-//        }
-//    }
+    @Test
+    public void shouldAllowInvokeHostFunctionWithoutUserData() throws Exception {
+
+        var parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+        var resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+
+        ExtismFunction helloWorldFunction = (plugin, params, returns, data) -> {
+            System.out.println("Hello from Java Host Function!");
+            System.out.println(String.format("Input string received from plugin, %s", plugin.inputString(params[0])));
+
+            int offs = plugin.alloc(4);
+            Pointer mem = plugin.memory();
+            mem.write(offs, "test".getBytes(), 0, 4);
+            returns[0].v.i64 = offs;
+
+            assertThat(data.isEmpty());
+        };
+
+        HostFunction f = new HostFunction<>(
+                "hello_world",
+                parametersTypes,
+                resultsTypes,
+                helloWorldFunction,
+                Optional.empty()
+        )
+                .withNamespace("extism:host/user");
+
+        HostFunction g = new HostFunction<>(
+                "hello_world",
+                parametersTypes,
+                resultsTypes,
+                helloWorldFunction,
+                Optional.empty()
+        )
+                .withNamespace("test");
+
+        HostFunction[] functions = {f,g};
+
+        Manifest manifest = new Manifest(Arrays.asList(CODE.pathWasmFunctionsSource()));
+        String functionName = "count_vowels";
+
+        try (var plugin = new Plugin(manifest, true, functions)) {
+            var output = plugin.call(functionName, "this is a test");
+            assertThat(output).isEqualTo("test");
+        }
+    }
 
 
     @Test

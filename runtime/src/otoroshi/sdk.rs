@@ -2,7 +2,7 @@
 
 use std::os::raw::c_char;
 
-use crate::{otoroshi::*, Plugin, sdk::{ExtismVal, Size, ExtismFunction, extism_plugin_new}, function};
+use crate::{otoroshi::*, Plugin, sdk::{ExtismVal, Size, ExtismFunction, extism_plugin_new}, function, CurrentPlugin, EXTISM_ENV_MODULE};
 
 use super::types::ExtismMemory;
 
@@ -207,20 +207,32 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_reset(
 
 #[no_mangle]
 pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
-    plugin: *mut Plugin,
+    plugin: *mut CurrentPlugin,
     name: *const std::ffi::c_char,
 ) -> *mut u8 {
     let plugin = &mut *plugin;
-    let lock = plugin.instance.clone();
-    let mut lock = lock.lock().unwrap();
+    
+    // let lock = plugin.instance.clone();
+    // let mut lock = lock.lock().unwrap();
 
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
         Ok(x) => x.to_string(),
-        Err(e) => return plugin.return_error(&mut lock, e, std::ptr::null_mut()),
+        Err(e) => return std::ptr::null_mut(),
     };
+
+    let linker = &mut *plugin.linker;
+    let mut store = &mut *plugin.store;
     
-    plugin.get_memory(&mut lock, name)
-}
+    match linker
+        .get(&mut store, EXTISM_ENV_MODULE, &name) {
+            None => std::ptr::null_mut(),
+            Some(external) => match external.into_memory() {
+            None => std::ptr::null_mut(),
+            Some(memory) => memory.data_mut(&mut store).as_mut_ptr()
+        }
+    }
+}        
+
 
 // #[no_mangle]
 // pub unsafe extern "C" fn wasm_otoroshi_extism_memory_bytes(

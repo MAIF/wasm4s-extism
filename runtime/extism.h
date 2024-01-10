@@ -123,7 +123,7 @@ ExtismVal *wasm_otoroshi_call(ExtismPlugin *plugin,
  */
 void wasm_otoroshi_extism_reset(ExtismPlugin *plugin);
 
-uint8_t *wasm_otoroshi_extism_get_memory(ExtismPlugin *plugin, const char *name);
+uint8_t *wasm_otoroshi_extism_get_memory(ExtismCurrentPlugin *plugin, const char *name);
 
 ExtismPlugin *extism_plugin_new_with_memories(const uint8_t *wasm,
                                               ExtismSize wasm_size,

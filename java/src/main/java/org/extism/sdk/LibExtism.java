@@ -86,6 +86,7 @@ public interface LibExtism extends Library {
                                 Pointer userData,
                                 Pointer freeUserData);
 
+    void extism_function_free(Pointer function);
 
     Pointer extism_memory_new(String name, String namespace, int minPages, int maxPages);
 
@@ -107,7 +108,7 @@ public interface LibExtism extends Library {
      */
     int extism_current_plugin_memory_alloc(Pointer plugin, long n);
 
-    Pointer extism_get_lineary_memory_from_host_functions(Pointer plugin, String memoryName);
+//    Pointer extism_get_lineary_memory_from_host_functions(Pointer plugin, String memoryName);
 
     /**
      * Free an allocated memory block
@@ -242,9 +243,7 @@ public interface LibExtism extends Library {
     void extism_function_set_namespace(Pointer p, String name);
 
     void extism_reset(Pointer contextPointer);
-    Pointer extism_get_lineary_memory_from_host_functions(Pointer plugin, int instanceIndex, String memoryName);
-
-    void deallocate_results(LibExtism.ExtismVal.ByReference results, int length);
+//    Pointer extism_get_lineary_memory_from_host_functions(Pointer plugin, int instanceIndex, String memoryName);
 
 
     // TODO - ADDED

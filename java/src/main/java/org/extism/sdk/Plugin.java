@@ -21,6 +21,10 @@ public class Plugin implements AutoCloseable {
      */
     protected final Pointer pluginPointer;
 
+    private final HostFunction[] functions;
+
+    private boolean freed = false;
+
     public Plugin(byte[] manifestBytes,
                   boolean withWASI,
                   HostFunction[] functions) {
@@ -46,6 +50,7 @@ public class Plugin implements AutoCloseable {
             throw new ExtismException(new String(msg));
         }
 
+        this.functions = functions;
         this.pluginPointer = p;
     }
 
@@ -79,6 +84,7 @@ public class Plugin implements AutoCloseable {
             throw new ExtismException(new String(msg));
         }
 
+        this.functions = functions;
         this.pluginPointer = p;
     }
 
@@ -147,21 +153,22 @@ public class Plugin implements AutoCloseable {
     protected String error() {
         return LibExtism.INSTANCE.extism_plugin_error(this.pluginPointer);
     }
+//
+//    public Results call(String functionName, Parameters params, int resultsLength) {
+//        return call(functionName, params, resultsLength/*, new byte[0]*/);
+//    }
 
-    public Results call(String functionName, Parameters params, int resultsLength) {
-        return call(functionName, params, resultsLength, new byte[0]);
-    }
-
-    public Results call(String functionName, Parameters params, int resultsLength, byte[] input) {
+    public Results call(String functionName, Parameters params, int resultsLength/*, byte[] input*/) {
         params.getPtr().write();
 
-        LibExtism.ExtismVal.ByReference results = LibExtism.INSTANCE.wasm_plugin_call(
+        LibExtism.ExtismVal.ByReference results = LibExtism.INSTANCE.wasm_otoroshi_call(
                 this.pluginPointer,
                 functionName,
                 params.getPtr(),
-                params.getLength(),
-                input,
-                input.length);
+                params.getLength()
+//                input,
+//                input.length
+        );
 
         if (results == null && resultsLength > 0) {
             String error = error();
@@ -183,7 +190,16 @@ public class Plugin implements AutoCloseable {
      * Frees a plugin from memory
      */
     public void free() {
-        LibExtism.INSTANCE.extism_plugin_free(this.pluginPointer);
+        if (this.functions != null){
+            for (int i = 0; i < this.functions.length; i++) {
+                this.functions[i].free();
+            }
+        }
+
+        if(!freed) {
+            freed = true;
+            LibExtism.INSTANCE.extism_plugin_free(this.pluginPointer);
+        }
     }
 
     /**
@@ -254,7 +270,7 @@ public class Plugin implements AutoCloseable {
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
         free();
     }
 }

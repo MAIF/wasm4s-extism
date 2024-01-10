@@ -7,6 +7,8 @@ public class Parameters implements AutoCloseable {
     protected LibExtism.ExtismVal[] values;
     private final int length;
 
+    private boolean freed = false;
+
     private int next = 0;
 
     public Parameters(int length) {
@@ -131,7 +133,10 @@ public class Parameters implements AutoCloseable {
 
     @Override
     public void close() {
-        LibExtism.INSTANCE.deallocate_results(this.ptr, this.length);
+        if(!freed) {
+            freed = true;
+            LibExtism.INSTANCE.wasm_otoroshi_deallocate_results(this.ptr, this.length);
+        }
     }
 
     interface AddFunction {
