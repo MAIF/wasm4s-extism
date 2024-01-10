@@ -106,6 +106,11 @@ typedef void (*ExtismFunctionType)(ExtismCurrentPlugin *plugin,
 typedef void (*ExtismLogDrainFunctionType)(const char *data, ExtismSize size);
 
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 void wasm_otoroshi_deallocate_results(ExtismVal *ptr, uintptr_t len);
 
 ExtismVal *wasm_otoroshi_call(ExtismPlugin *plugin,

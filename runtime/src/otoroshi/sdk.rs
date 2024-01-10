@@ -2,8 +2,6 @@
 
 use std::os::raw::c_char;
 
-use tracing::{error, debug};
-
 use crate::{otoroshi::*, Plugin, sdk::{ExtismVal, Size, ExtismFunction, extism_plugin_new}, function};
 
 use super::types::ExtismMemory;

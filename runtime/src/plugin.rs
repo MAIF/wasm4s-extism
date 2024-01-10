@@ -2,9 +2,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::*;
 
-// TODO - ADDED
-// pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
-pub const EXTISM_ENV_MODULE: &str = "env";
+pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
 pub(crate) const MAIN_KEY: &str = "main";
 
@@ -264,8 +262,7 @@ impl Plugin {
             ($($name:ident($($args:expr),*) $(-> $($r:expr),*)?);* $(;)?) => {
                 $(
                     let t = FuncType::new([$($args),*], [$($($r),*)?]);
-                    // TODO - ADDED
-                    linker.func_new(EXTISM_ENV_MODULE, concat!("extism_", stringify!($name)), t, pdk::$name)?;
+                    linker.func_new(EXTISM_ENV_MODULE, stringify!($name), t, pdk::$name)?;
                 )*
             };
         }
@@ -282,20 +279,6 @@ impl Plugin {
             log_info(I64);
             log_debug(I64);
             log_error(I64);
-
-            // TODO
-            alloc(I64) -> I64;
-            free(I64);
-            load_u8(I64) -> I32;
-            load_u64(I64) -> I64;
-            store_u8(I64, I32);
-            store_u64(I64, I64);
-            input_length() -> I64;
-            input_load_u8(I64) -> I32;
-            input_load_u64(I64) -> I64;
-            output_set(I64, I64);
-            error_set(I64);
-            length(I64) -> I64;
         );
 
         for f in &mut imports {
@@ -897,7 +880,7 @@ impl Plugin {
         let lock = self.instance.clone();
         let mut lock = lock.lock().unwrap();
         let data = input.to_bytes().map_err(|e| (e, -1))?;
-        self.raw_call(&mut lock, name, data)
+        self.raw_call(&mut lock, name, data, false, None, None)
             .and_then(move |_| self.output().map_err(|e| (e, -1)))
     }
 
