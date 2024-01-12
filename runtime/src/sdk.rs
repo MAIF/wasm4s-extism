@@ -275,6 +275,7 @@ pub unsafe extern "C" fn extism_plugin_new(
     wasm_size: Size,
     functions: *mut *const ExtismFunction,
     n_functions: Size,
+    memories: Vec<&crate::otoroshi::wasm_memory::WasmMemory>,
     with_wasi: bool,
     errmsg: *mut *mut std::ffi::c_char,
 ) -> *mut Plugin {
@@ -302,7 +303,7 @@ pub unsafe extern "C" fn extism_plugin_new(
         }
     }
 
-    let plugin = Plugin::new(data, funcs, with_wasi);
+    let plugin = Plugin::new(data, funcs, memories, with_wasi);
     match plugin {
         Err(e) => {
             if !errmsg.is_null() {
@@ -472,6 +473,7 @@ pub unsafe extern "C" fn extism_plugin_call(
     if plugin.is_null() {
         return -1;
     }
+
     let plugin = &mut *plugin;
     let lock = plugin.instance.clone();
     let mut lock = lock.lock().unwrap();

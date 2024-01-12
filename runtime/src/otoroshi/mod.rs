@@ -1,6 +1,6 @@
 use wasmtime::*;
 
-mod types;
+pub mod types;
 pub mod sdk;
 pub mod wasm_memory;
 

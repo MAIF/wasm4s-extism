@@ -142,7 +142,53 @@ public class WasmOtoroshiTests {
 
         var instance = new Plugin(manifest, true, functions, new LinearMemory[0]);
         instance.call("execute", "".getBytes(StandardCharsets.UTF_8));
-
         instance.free();
+    }
+
+    @Test
+    public void shouldCreateLinearMemory() {
+        var manifest = new Manifest(Collections.singletonList(CODE.pathWasmWebAssemblyFunctionSource()), new MemoryOptions(4));
+        LibExtism.ExtismValType[] parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+        LibExtism.ExtismValType[] resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+
+        var functions = new HostFunction[]{
+                new HostFunction<>(
+                        "hello_world",
+                        parametersTypes,
+                        resultsTypes,
+                        (plugin, params, returns, data) -> {
+                            System.out.println("Hello from Java Host Function!");
+                        },
+                        Optional.empty()
+                ).withNamespace("env")
+        };
+
+        var memory = new LinearMemory("huge-memory", new LinearMemoryOptions(0, Optional.of(2)));
+
+        var instance = new Plugin(manifest, true, functions, new LinearMemory[]{memory});
+        instance.call("execute", "".getBytes(StandardCharsets.UTF_8));
+        instance.free();
+    }
+
+    @Test
+    public void shouldPluginWithNewVersionRun() {
+        var manifest = new Manifest(Collections.singletonList(CODE.getMajorRelease()), new MemoryOptions(50));
+
+        var instance = new Plugin(manifest, true, null);
+        instance.call("execute", "{}".getBytes(StandardCharsets.UTF_8));
+        instance.free();
+    }
+
+    @Test
+    public void shouldOPAWorks() {
+        var opa = new OPA(CODE.getOPA());
+
+        var values = opa.initialize();
+//        var result = opa.evaluate(
+//                (int)values.toArray()[0],
+//                (int)values.toArray()[1],
+//                "{ \"request\" -> { \"headers\" -> { \"foo\": \"bar\" } } }");
+//
+//        System.out.println(result);
     }
 }

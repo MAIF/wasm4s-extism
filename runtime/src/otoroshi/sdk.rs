@@ -139,31 +139,31 @@ pub(crate) unsafe extern "C" fn wasm_otoroshi_call(
 //     wasm_otoroshi_plugin_call_native(plugin_ptr, func_name, p);
 // }
 
-// #[no_mangle]
-// pub(crate) unsafe extern "C" fn wasm_otoroshi_create_wasmtime_memory(
-//     name: *const std::ffi::c_char,
-//     namespace: *const std::ffi::c_char,
-//     min_pages: u32,
-//     max_pages: u32,
-// ) -> *mut ExtismMemory {
-//     let name = match std::ffi::CStr::from_ptr(name).to_str() {
-//         Ok(x) => x.to_string(),
-//         Err(_) => {
-//             return std::ptr::null_mut();
-//         }
-//     };
+#[no_mangle]
+pub(crate) unsafe extern "C" fn wasm_otoroshi_create_wasmtime_memory(
+    name: *const std::ffi::c_char,
+    namespace: *const std::ffi::c_char,
+    min_pages: u32,
+    max_pages: u32,
+) -> *mut ExtismMemory {
+    let name = match std::ffi::CStr::from_ptr(name).to_str() {
+        Ok(x) => x.to_string(),
+        Err(_) => {
+            return std::ptr::null_mut();
+        }
+    };
 
-//     let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
-//         Ok(x) => x.to_string(),
-//         Err(_) => {
-//             return std::ptr::null_mut();
-//         }
-//     };
+    let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
+        Ok(x) => x.to_string(),
+        Err(_) => {
+            return std::ptr::null_mut();
+        }
+    };
 
-//     let mem = WasmMemory::new(name, namespace, min_pages, max_pages);
+    let mem = WasmMemory::new(name, namespace, min_pages, max_pages);
 
-//     Box::into_raw(Box::new(ExtismMemory(mem)))
-// }
+    Box::into_raw(Box::new(ExtismMemory(mem)))
+}
 
 // #[no_mangle]
 // pub extern "C" fn wasm_otoroshi_free_memory(mem: *mut ExtismMemory) {
@@ -174,7 +174,7 @@ pub(crate) unsafe extern "C" fn wasm_otoroshi_call(
 
 /// Remove all plugins from the registry
 #[no_mangle]
-pub unsafe extern "C" fn wasm_otoroshi_extism_reset(
+pub unsafe extern "C" fn extism_reset(
     plugin: *mut Plugin
 ) {
     let plugin = &mut *plugin;
@@ -184,26 +184,37 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_reset(
     let _ = plugin.reset_store(&mut lock);
 }
 
-// #[no_mangle]
-// pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
-//     instance_ptr: *mut WasmPlugin,
-//     data: *const u8,
-//     data_size: Size,
-//     offset: u32,
-// ) -> i8 {
-//     let plugin = &mut *instance_ptr;
+#[no_mangle]
+pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
+    instance_ptr: *mut CurrentPlugin,
+    data: *const u8,
+    data_size: Size,
+    offset: u32,
+) -> i8 {
+    let plugin = &mut *instance_ptr;
 
-//     let memory = match plugin.get_memory("memory") {
-//         Some(x) => x,
-//         None => return plugin.error(format!("Memory not found: memory"), -1),
-//     };
+    let linker = &mut *plugin.linker;
+    let mut store = &mut *plugin.store;
+    
+    let data = std::slice::from_raw_parts(data, data_size as usize);
 
-//     let data = std::slice::from_raw_parts(data, data_size as usize);
-//     match memory.write(&mut plugin.memory.store, offset as usize, data) {
-//         Ok(()) => 0,
-//         Err(_) => -1,
-//     }
-// }
+    match linker
+        .get(&mut store, EXTISM_ENV_MODULE, "memory") {
+            None => -1,
+            Some(external) => match external.into_memory() {
+                None => -1,
+                Some(memory) => match memory.write(store, offset as usize, data) {
+                    Ok(()) => 0,
+                    Err(_) => -1,
+                }
+            }
+    }
+
+    // match memory.write(data) {
+    //     Ok(()) => 0,
+    //     Err(_) => -1,
+    // }
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
@@ -211,9 +222,6 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
     name: *const std::ffi::c_char,
 ) -> *mut u8 {
     let plugin = &mut *plugin;
-    
-    // let lock = plugin.instance.clone();
-    // let mut lock = lock.lock().unwrap();
 
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
         Ok(x) => x.to_string(),
@@ -227,24 +235,31 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
         .get(&mut store, EXTISM_ENV_MODULE, &name) {
             None => std::ptr::null_mut(),
             Some(external) => match external.into_memory() {
-            None => std::ptr::null_mut(),
-            Some(memory) => memory.data_mut(&mut store).as_mut_ptr()
-        }
+                None => std::ptr::null_mut(),
+                Some(memory) => memory.data_mut(&mut store).as_mut_ptr()
+            }
     }
 }        
 
 
-// #[no_mangle]
-// pub unsafe extern "C" fn wasm_otoroshi_extism_memory_bytes(
-//     instance_ptr: *mut WasmPlugin
-// ) -> usize {
-//     let plugin = &mut *instance_ptr;
+#[no_mangle]
+pub unsafe extern "C" fn wasm_otoroshi_extism_memory_bytes(
+    instance_ptr: *mut CurrentPlugin
+) -> usize {
+    let plugin = &mut *instance_ptr;
 
-//     match plugin.instance.get_memory(&mut plugin.memory.store, "memory") {
-//         Some(mem) => mem.data(&plugin.memory.store).len(),
-//         None => 0 as usize
-//     }
-// }
+    let linker = &mut *plugin.linker;
+    let mut store = &mut *plugin.store;
+    
+    match linker
+        .get(&mut store, EXTISM_ENV_MODULE, "memory") {
+            None => 0 as usize,
+            Some(external) => match external.into_memory() {
+                None => 0 as usize,
+                Some(memory) => memory.data(&store).len()
+            }
+    }
+}
 
 
 
@@ -260,8 +275,6 @@ pub(crate) unsafe extern "C" fn extism_plugin_new_with_memories(
     errmsg: *mut *mut std::ffi::c_char
 ) -> *mut Plugin {
 
-    let plugin = extism_plugin_new(wasm, wasm_size, functions, n_functions, with_wasi, errmsg);
-
     let mut mems: Vec<&WasmMemory> = vec![];
 
     if !memories.is_null() {
@@ -275,28 +288,24 @@ pub(crate) unsafe extern "C" fn extism_plugin_new_with_memories(
                 mems.push(&f.0);
             }
         }
-    }    
+    }  
 
-    for m in mems {
-        let name = m.name.to_string();
-        let ns = m.namespace.to_string();
+    let plugin = extism_plugin_new(wasm, wasm_size, functions, n_functions, mems, with_wasi, errmsg);
 
 
-        let mem = wasmtime::Memory::new(
-            &mut (*plugin).store, 
-            m.ty.clone()).unwrap(); // TODO - dont do that
-        (*plugin).linker.define(&mut (*plugin).store, &ns, &name, mem).unwrap();
-    }
+    // for m in mems {
+    //     let name = m.name.to_string();
+    //     let ns = m.namespace.to_string();
+
+    //     let store = &mut (*plugin).store;
+        
+    //     // let memory_type = m.ty.clone();
+    //     let memory_type = MemoryType::new(1, None);
+
+    //     let mem = wasmtime::Memory::new(store, memory_type).unwrap(); // TODO - don't do that
+
+    //     // (*plugin).linker.define(&mut (*plugin).store, &ns, &name, mem).unwrap();
+    // }
 
     plugin
- 
-    // match template.instantiate(engine, funcs, mems, with_wasi) {
-    //     Err(err) => panic!("{}", err), //std::ptr::null_mut(),
-    //     Ok(instance) => {
-    //         let inst = Box::into_raw(Box::new(instance));
-    //         let plugin = unsafe { &mut *inst };
-    //         plugin.borrow_mut().set_wasm_plugin();
-    //         inst
-    //     }
-    // }
 }

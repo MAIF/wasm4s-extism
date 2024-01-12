@@ -67,6 +67,8 @@ typedef struct ExtismMemory ExtismMemory;
  */
 typedef struct ExtismPlugin ExtismPlugin;
 
+typedef struct Vec______WasmMemory Vec______WasmMemory;
+
 /**
  * A union type for host function argument/return values
  */
@@ -118,12 +120,24 @@ ExtismVal *wasm_otoroshi_call(ExtismPlugin *plugin,
                               const ExtismVal *params,
                               ExtismSize n_params);
 
+ExtismMemory *wasm_otoroshi_create_wasmtime_memory(const char *name,
+                                                   const char *namespace_,
+                                                   uint32_t min_pages,
+                                                   uint32_t max_pages);
+
 /**
  * Remove all plugins from the registry
  */
-void wasm_otoroshi_extism_reset(ExtismPlugin *plugin);
+void extism_reset(ExtismPlugin *plugin);
+
+int8_t wasm_otoroshi_extism_memory_write_bytes(ExtismCurrentPlugin *instance_ptr,
+                                               const uint8_t *data,
+                                               ExtismSize data_size,
+                                               uint32_t offset);
 
 uint8_t *wasm_otoroshi_extism_get_memory(ExtismCurrentPlugin *plugin, const char *name);
+
+uintptr_t wasm_otoroshi_extism_memory_bytes(ExtismCurrentPlugin *instance_ptr);
 
 ExtismPlugin *extism_plugin_new_with_memories(const uint8_t *wasm,
                                               ExtismSize wasm_size,
@@ -212,6 +226,7 @@ ExtismPlugin *extism_plugin_new(const uint8_t *wasm,
                                 ExtismSize wasm_size,
                                 const ExtismFunction **functions,
                                 ExtismSize n_functions,
+                                Vec______WasmMemory memories,
                                 bool with_wasi,
                                 char **errmsg);
 

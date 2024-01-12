@@ -273,4 +273,16 @@ public class Plugin implements AutoCloseable {
     public void close() {
         free();
     }
+
+    public int writeBytes(byte[] data, int n, int offset) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset);
+    }
+
+    public Pointer getMemory(String name) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pluginPointer, name);
+    }
+
+    public int getMemorySize() {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_bytes(this.pluginPointer);
+    }
 }

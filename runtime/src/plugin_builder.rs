@@ -153,6 +153,7 @@ impl<'a> PluginBuilder<'a> {
         Plugin::build_new(
             self.source,
             self.functions,
+            Vec::with_capacity(0),
             self.wasi,
             self.debug_options,
             self.cache_config,

@@ -1,7 +1,6 @@
 package org.extism.sdk;
 
 import com.sun.jna.*;
-import org.extism.sdk.wasmotoroshi.WasmOtoroshiMemory;
 
 /**
  * Wrapper around the Extism library.
@@ -249,7 +248,7 @@ public interface LibExtism extends Library {
     // TODO - ADDED
     Pointer wasm_otoroshi_create_wasmtime_memory(String name, String namespace, int minPages, int maxPages);
     // TODO - ADDED
-    void wasm_otoroshi_free_memory(WasmOtoroshiMemory memory);
+    void wasm_otoroshi_free_memory(Pointer memory);
     // TODO - ADDED
     void wasm_otoroshi_deallocate_results(LibExtism.ExtismVal.ByReference results, int length);
     // TODO - ADDED
@@ -275,7 +274,7 @@ public interface LibExtism extends Library {
     // TODO - ADDED
     Pointer wasm_otoroshi_extism_get_memory(Pointer instance, String memoryName);
     // TODO - ADDED
-    void wasm_otoroshi_extism_reset(Pointer pluginPointer);
+//    void extism_reset(Pointer pluginPointer);
     // TODO - ADDED
     int wasm_otoroshi_extism_memory_bytes(Pointer pluginPointer);
 

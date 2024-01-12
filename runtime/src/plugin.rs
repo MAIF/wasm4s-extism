@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
-use crate::*;
+use crate::{*, otoroshi::WasmMemory};
 
 pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
@@ -183,14 +183,16 @@ impl Plugin {
     pub fn new<'a>(
         wasm: impl Into<WasmInput<'a>>,
         imports: impl IntoIterator<Item = Function>,
+        memories: Vec<&WasmMemory>,
         with_wasi: bool,
     ) -> Result<Plugin, Error> {
-        Self::build_new(wasm.into(), imports, with_wasi, Default::default(), None)
+        Self::build_new(wasm.into(), imports, memories, with_wasi, Default::default(), None)
     }
 
     pub(crate) fn build_new(
         wasm: WasmInput<'_>,
         imports: impl IntoIterator<Item = Function>,
+        memories: Vec<&WasmMemory>,
         with_wasi: bool,
         debug_options: DebugOptions,
         cache_dir: Option<Option<PathBuf>>,
@@ -287,6 +289,17 @@ impl Plugin {
             unsafe {
                 linker.func_new(ns, &name, f.ty().clone(), &*(f.f.as_ref() as *const _))?;
             }
+        }
+
+        let mut memories: Vec<&WasmMemory> = memories.into_iter().collect();
+        for f in &mut memories {
+            // let ns = &f.namespace;
+            let ns = "env";
+        
+            let memory_type = MemoryType::new(5, Some(10));
+
+            let mem = wasmtime::Memory::new(&mut store, memory_type).unwrap(); // TODO - don't do that
+            linker.define(&store, &ns, &f.name, mem)?;
         }
 
         let instance_pre = linker.instantiate_pre(main)?;

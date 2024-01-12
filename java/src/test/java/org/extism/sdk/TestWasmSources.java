@@ -28,6 +28,10 @@ public enum TestWasmSources {
         }
 
         public Path getCorazaFilePath() { return Paths.get(WASM_LOCATION, "coraza.wasm"); }
+
+        public Path getMajorReleasePath() { return Paths.get(WASM_LOCATION, "test-1.0.0-dev.wasm"); }
+
+        public Path getOPAPath() { return Paths.get(WASM_LOCATION, "opa.wasm"); }
     };
 
     public static final String WASM_LOCATION = "src/test/resources";
@@ -39,6 +43,10 @@ public enum TestWasmSources {
     public abstract Path getRawAdditionFilePath();
 
     public abstract Path getCorazaFilePath();
+
+    public abstract Path getMajorReleasePath();
+
+    public abstract Path getOPAPath();
 
     public abstract Path getWasmWebAssemblyFunctionFilePath();
 
@@ -56,6 +64,14 @@ public enum TestWasmSources {
 
     public PathWasmSource getCorazaPath() {
         return resolvePathWasmSource(getCorazaFilePath());
+    }
+
+    public PathWasmSource getMajorRelease() {
+        return resolvePathWasmSource(getMajorReleasePath());
+    }
+
+    public PathWasmSource getOPA() {
+        return resolvePathWasmSource(getOPAPath());
     }
 
     public PathWasmSource pathWasmWebAssemblyFunctionSource() {
