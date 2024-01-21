@@ -6,7 +6,7 @@ use crate::*;
 
 pub type ExtismMemoryHandle = u64;
 pub type Size = u64;
-pub struct ExtismFunction(std::cell::Cell<Option<Function>>);
+pub struct ExtismFunction(pub std::cell::Cell<Option<Function>>);
 
 /// The return code used to specify a successful plugin call
 pub static EXTISM_SUCCESS: i32 = 0;
@@ -72,7 +72,13 @@ impl From<&wasmtime::Val> for ExtismVal {
                     f64: value.unwrap_f64(),
                 },
             },
-            t => todo!("{}", t),
+            // t => todo!("{}", t),
+            _ => ExtismVal {
+                t: ValType::I32,
+                v: ValUnion {
+                    i32: -1,
+                },
+            },
         }
     }
 }
@@ -275,7 +281,6 @@ pub unsafe extern "C" fn extism_plugin_new(
     wasm_size: Size,
     functions: *mut *const ExtismFunction,
     n_functions: Size,
-    memories: Vec<&crate::otoroshi::wasm_memory::WasmMemory>,
     with_wasi: bool,
     errmsg: *mut *mut std::ffi::c_char,
 ) -> *mut Plugin {
@@ -303,7 +308,7 @@ pub unsafe extern "C" fn extism_plugin_new(
         }
     }
 
-    let plugin = Plugin::new(data, funcs, memories, with_wasi);
+    let plugin = Plugin::new(data, funcs, with_wasi);
     match plugin {
         Err(e) => {
             if !errmsg.is_null() {

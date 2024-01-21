@@ -126,7 +126,9 @@ public class OPA {
                     plugin.writeBytes(
                             value,
                             value_buf_len,
-                            raw_addr.getValue(0).v.i32
+                            raw_addr.getValue(0).v.i32,
+                            "env",
+                            "memory"
                     ) == -1
             ) {
                 return "Cant' write in memory";
@@ -159,7 +161,7 @@ public class OPA {
 
         var data_heap_ptr = base_heap_ptr.getValue(0).v.i32;
 
-        return new Tuple(dataAddr, data_heap_ptr);
+        return new Tuple(Integer.parseInt(dataAddr), data_heap_ptr);
     }
 
     String evaluate(
@@ -174,7 +176,9 @@ public class OPA {
         plugin.writeBytes(
                 input.getBytes(StandardCharsets.UTF_8),
                 input_len,
-                baseHeapPtr
+                baseHeapPtr,
+                "env",
+                "memory"
         );
 
         var heap_ptr   = baseHeapPtr + input_len;
@@ -185,7 +189,7 @@ public class OPA {
 
         var ret = plugin.call("opa_eval", ptr, 1);
 
-        var memory = plugin.getMemory("memory");
+        var memory = plugin.getMemory("memory", "env");
 
         var offset    = ret.getValue(0).v.i32;
         var arraySize = 65356;

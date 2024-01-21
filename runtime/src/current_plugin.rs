@@ -15,6 +15,9 @@ pub struct CurrentPlugin {
     pub(crate) available_pages: Option<u32>,
     pub(crate) memory_limiter: Option<MemoryLimiter>,
     pub(crate) id: uuid::Uuid,
+
+    // TODO - added
+    pub(crate) current_instance: *mut wasmtime::Instance
 }
 
 unsafe impl Send for CurrentPlugin {}
@@ -328,6 +331,7 @@ impl CurrentPlugin {
             vars: BTreeMap::new(),
             linker: std::ptr::null_mut(),
             store: std::ptr::null_mut(),
+            current_instance: std::ptr::null_mut(),
             available_pages,
             memory_limiter,
             id,
@@ -462,5 +466,9 @@ impl Internal for CurrentPlugin {
 
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>) {
         unsafe { (&mut *self.linker, &mut *self.store) }
+    }
+    
+    fn instance_and_store(&mut self) -> (&mut Instance, &mut Store<CurrentPlugin>) {
+        unsafe { (&mut *self.current_instance, &mut *self.store) }
     }
 }

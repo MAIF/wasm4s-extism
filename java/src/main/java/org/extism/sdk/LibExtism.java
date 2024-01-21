@@ -215,9 +215,7 @@ public interface LibExtism extends Library {
             Pointer contextPointer,
             String function_name,
             ExtismVal.ByReference inputs,
-            int nInputs,
-            byte[] data,
-            int dataLength);
+            int nInputs);
 
     Pointer extism_plugin_call_native(Pointer contextPointer, String function_name, ExtismVal inputs, int nInputs);
 
@@ -241,7 +239,8 @@ public interface LibExtism extends Library {
     boolean extism_plugin_cancel(Pointer contextPointer);
     void extism_function_set_namespace(Pointer p, String name);
 
-    void extism_reset(Pointer contextPointer);
+    // void extism_reset(Pointer contextPointer);
+    void extism_plugin_reset(Pointer contextPointer);
 //    Pointer extism_get_lineary_memory_from_host_functions(Pointer plugin, int instanceIndex, String memoryName);
 
 
@@ -270,9 +269,12 @@ public interface LibExtism extends Library {
                                                         LibExtism.ExtismVal.ByReference inputs,
                                                         int nInputs);
     // TODO - ADDED
-    int wasm_otoroshi_extism_memory_write_bytes(Pointer pluginPointer, byte[] data, int n, int offset);
+    int wasm_otoroshi_extism_memory_write_bytes(Pointer pluginPointer, byte[] data, int n, int offset, String namespace, String name);
     // TODO - ADDED
-    Pointer wasm_otoroshi_extism_get_memory(Pointer instance, String memoryName);
+    Pointer wasm_otoroshi_extism_get_memory(Pointer instance, String memoryName, String namespace);
+
+    Pointer wasm_otoroshi_extism_get_linear_memory(Pointer instance, String memoryName, String namespace);
+
     // TODO - ADDED
 //    void extism_reset(Pointer pluginPointer);
     // TODO - ADDED

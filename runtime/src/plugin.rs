@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
-use crate::{*, otoroshi::WasmMemory};
+use crate::{otoroshi::WasmMemory, *};
 
 pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
@@ -108,6 +108,15 @@ impl Internal for Plugin {
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>) {
         (&mut self.linker, &mut self.store)
     }
+
+    fn instance_and_store(&mut self) -> (&mut Instance, &mut Store<CurrentPlugin>) {
+        unsafe {
+            (
+                &mut *self.current_plugin_mut().current_instance,
+                &mut self.store,
+            )
+        }
+    }
 }
 
 pub(crate) fn profiling_strategy() -> ProfilingStrategy {
@@ -183,10 +192,32 @@ impl Plugin {
     pub fn new<'a>(
         wasm: impl Into<WasmInput<'a>>,
         imports: impl IntoIterator<Item = Function>,
+        with_wasi: bool,
+    ) -> Result<Plugin, Error> {
+        Self::build_new(
+            wasm.into(),
+            imports,
+            [].to_vec(),
+            with_wasi,
+            Default::default(),
+            None,
+        )
+    }
+
+    pub fn new_with_memories<'a>(
+        wasm: impl Into<WasmInput<'a>>,
+        imports: impl IntoIterator<Item = Function>,
         memories: Vec<&WasmMemory>,
         with_wasi: bool,
     ) -> Result<Plugin, Error> {
-        Self::build_new(wasm.into(), imports, memories, with_wasi, Default::default(), None)
+        Self::build_new(
+            wasm.into(),
+            imports,
+            memories,
+            with_wasi,
+            Default::default(),
+            None,
+        )
     }
 
     pub(crate) fn build_new(
@@ -293,13 +324,8 @@ impl Plugin {
 
         let mut memories: Vec<&WasmMemory> = memories.into_iter().collect();
         for f in &mut memories {
-            // let ns = &f.namespace;
-            let ns = "env";
-        
-            let memory_type = MemoryType::new(5, Some(10));
-
-            let mem = wasmtime::Memory::new(&mut store, memory_type).unwrap(); // TODO - don't do that
-            linker.define(&store, &ns, &f.name, mem)?;
+            let mem = wasmtime::Memory::new(&mut store, f.ty.clone()).unwrap();
+            linker.define(&store, &f.namespace, &f.name, mem)?;
         }
 
         let instance_pre = linker.instantiate_pre(main)?;
@@ -352,9 +378,13 @@ impl Plugin {
             self.store.set_epoch_deadline(1);
             let store = &mut self.store as *mut _;
             let linker = &mut self.linker as *mut _;
+            let current_instance = &mut self.instance.lock().unwrap().unwrap() as *mut _;
+        
+        
             let current_plugin = self.current_plugin_mut();
             current_plugin.store = store;
             current_plugin.linker = linker;
+            current_plugin.current_instance = current_instance;
             if current_plugin.available_pages.is_some() {
                 self.store
                     .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
@@ -384,7 +414,11 @@ impl Plugin {
             return Ok(());
         }
 
-        let instance = self.instance_pre.instantiate(&mut self.store)?;
+        let mut instance = self.instance_pre.instantiate(&mut self.store)?;
+
+        let current_instance = &mut instance as *mut _;
+        self.current_plugin_mut().current_instance = current_instance;
+
         trace!(
             plugin = self.id.to_string(),
             "Plugin::instance is none, instantiating"
@@ -394,6 +428,7 @@ impl Plugin {
         if let Some(limiter) = &mut self.current_plugin_mut().memory_limiter {
             limiter.reset();
         }
+
         self.detect_guest_runtime(instance_lock);
         self.initialize_guest_runtime()?;
         Ok(())
@@ -433,9 +468,14 @@ impl Plugin {
         {
             let store = &mut self.store as *mut _;
             let linker = &mut self.linker as *mut _;
+
+        
+            let current_instance = &mut self.instance.lock().unwrap().unwrap() as *mut _;
+            
             let current_plugin = self.current_plugin_mut();
             current_plugin.store = store;
             current_plugin.linker = linker;
+            current_plugin.current_instance = current_instance;
         }
 
         let bytes = unsafe { std::slice::from_raw_parts(input, len) };
@@ -625,23 +665,6 @@ impl Plugin {
         Ok(())
     }
 
-    // TODO - ADDED
-    pub(crate) fn get_memory(
-        &mut self,
-        instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
-        name: impl AsRef<str>,
-    ) -> *mut u8 {
-        if let Some(instance) = &mut **instance_lock {
-            match instance
-                .get_memory(&mut self.store, name.as_ref()) {
-                    Some(memory) => memory.data_mut(&mut self.store).as_mut_ptr(),
-                    None => std::ptr::null_mut()
-                }
-        } else {
-            std::ptr::null_mut()
-        }
-    }
-
     // Implements the build of the `call` function, `raw_call` is also used in the SDK
     // code
     pub(crate) fn raw_call(
@@ -708,11 +731,13 @@ impl Plugin {
         let mut res: Result<()> = if use_extism {
             func.call(self.store_mut(), &[], results.as_mut_slice())
         } else {
-            func.call(
-                self.store_mut(),
-                &params.unwrap()[..],
-                results.as_mut_slice(),
-            )
+            let empty_params: &[wasmtime::Val] = &[];
+            let params = params
+                .as_ref()
+                .map(|r| r.as_slice())
+                .unwrap_or(empty_params);
+
+            func.call(self.store_mut(), &params, results.as_mut_slice())
         };
 
         if !use_extism {
@@ -724,7 +749,7 @@ impl Plugin {
         self.store
             .epoch_deadline_callback(|_| Ok(UpdateDeadline::Continue(1)));
         let _ = self.timer_tx.send(TimerAction::Stop { id: self.id });
-        self.store_needs_reset = name == "_start";
+        // self.store_needs_reset = name == "_start";
 
         // Get extism error
         if use_extism {
@@ -732,7 +757,7 @@ impl Plugin {
         }
 
         let mut rc = 0;
-        if !results.is_empty() {
+        if use_extism && !results.is_empty() {
             rc = results[0].i32().unwrap_or(-1);
             debug!(plugin = self.id.to_string(), "got return code: {}", rc);
         }
@@ -763,6 +788,7 @@ impl Plugin {
         match res {
             Ok(()) => Ok(rc),
             Err(e) => {
+                panic!("{:#?}", e);
                 if let Some(coredump) = e.downcast_ref::<wasmtime::WasmCoreDump>() {
                     if let Some(file) = self.debug_options.coredump.clone() {
                         debug!(
@@ -874,7 +900,7 @@ impl Plugin {
         let lock = self.instance.clone();
         let mut lock = lock.lock().unwrap();
         let data = input.to_bytes()?;
-        self.raw_call(&mut lock, name, data, false, None, None)
+        self.raw_call(&mut lock, name, data, true, None, None)
             .map_err(|e| e.0)
             .and_then(move |_| self.output())
     }
@@ -893,7 +919,7 @@ impl Plugin {
         let lock = self.instance.clone();
         let mut lock = lock.lock().unwrap();
         let data = input.to_bytes().map_err(|e| (e, -1))?;
-        self.raw_call(&mut lock, name, data, false, None, None)
+        self.raw_call(&mut lock, name, data, true, None, None)
             .and_then(move |_| self.output().map_err(|e| (e, -1)))
     }
 

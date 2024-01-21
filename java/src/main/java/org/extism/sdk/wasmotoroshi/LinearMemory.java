@@ -1,6 +1,7 @@
 package org.extism.sdk.wasmotoroshi;
 
 import com.sun.jna.Pointer;
+import org.extism.sdk.HostFunction;
 import org.extism.sdk.LibExtism;
 
 public class LinearMemory {
@@ -44,6 +45,7 @@ public class LinearMemory {
 
         return ptr;
     }
+
 
     public String getName() {
         return name;

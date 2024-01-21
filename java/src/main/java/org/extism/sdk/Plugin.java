@@ -153,12 +153,9 @@ public class Plugin implements AutoCloseable {
     protected String error() {
         return LibExtism.INSTANCE.extism_plugin_error(this.pluginPointer);
     }
-//
-//    public Results call(String functionName, Parameters params, int resultsLength) {
-//        return call(functionName, params, resultsLength/*, new byte[0]*/);
-//    }
 
-    public Results call(String functionName, Parameters params, int resultsLength/*, byte[] input*/) {
+
+    public Results call(String functionName, Parameters params, int resultsLength) {
         params.getPtr().write();
 
         LibExtism.ExtismVal.ByReference results = LibExtism.INSTANCE.wasm_otoroshi_call(
@@ -166,22 +163,17 @@ public class Plugin implements AutoCloseable {
                 functionName,
                 params.getPtr(),
                 params.getLength()
-//                input,
-//                input.length
         );
 
         if (results == null && resultsLength > 0) {
             String error = error();
-            throw new ExtismException(error);
+            System.out.println(error);
+//            throw new ExtismException(error);
+            return new Results(0);
         }
 
         if (results == null) {
-            if (resultsLength > 0) {
-                String error = error();
-                throw new ExtismException(error);
-            } else {
-                return new Results(0);
-            }
+            return new Results(0);
         } else {
             return new Results(results, resultsLength);
         }
@@ -234,7 +226,7 @@ public class Plugin implements AutoCloseable {
     }
 
     public void reset() {
-        LibExtism.INSTANCE.extism_reset(this.pluginPointer);
+        LibExtism.INSTANCE.extism_plugin_reset(this.pluginPointer);
     }
 
     public Pointer callWithoutParams(String functionName, int resultsLength) {
@@ -264,9 +256,7 @@ public class Plugin implements AutoCloseable {
                 this.pluginPointer,
                 functionName,
                 params.getPtr(),
-                params.getLength(),
-                new byte[0],
-                0);
+                params.getLength());
     }
 
     @Override
@@ -274,12 +264,16 @@ public class Plugin implements AutoCloseable {
         free();
     }
 
-    public int writeBytes(byte[] data, int n, int offset) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset);
+    public int writeBytes(byte[] data, int n, int offset, String namespace) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset, namespace, null);
     }
 
-    public Pointer getMemory(String name) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pluginPointer, name);
+    public int writeBytes(byte[] data, int n, int offset, String namespace, String name) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset, namespace, name);
+    }
+
+    public Pointer getMemory(String name, String namespace) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pluginPointer, name, namespace);
     }
 
     public int getMemorySize() {

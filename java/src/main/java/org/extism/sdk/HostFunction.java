@@ -100,14 +100,13 @@ public class HostFunction<T extends HostUserData> {
         }
     }
 
-    public HostFunction withNamespace(String name) {
+    public HostFunction<T> withNamespace(String name) {
         this.setNamespace(name);
         return this;
     }
 
     public void free() {
         if (!this.freed) {
-            System.out.println("remove extism function");
             LibExtism.INSTANCE.extism_function_free(this.pointer);
             this.freed = true;
         }

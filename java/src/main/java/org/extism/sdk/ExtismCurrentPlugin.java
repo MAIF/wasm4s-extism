@@ -20,7 +20,11 @@ public class ExtismCurrentPlugin {
     }
 
     public Pointer getLinearMemory(String memoryName) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pointer, memoryName);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_linear_memory(this.pointer, memoryName, "env");
+    }
+
+    public Pointer getLinearMemory(String memoryName, String namespace) {
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_linear_memory(this.pointer, memoryName, namespace);
     }
 
     public void free(long offset) {
