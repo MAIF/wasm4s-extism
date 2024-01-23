@@ -77,6 +77,9 @@ pub struct Plugin {
     pub(crate) store_needs_reset: bool,
 
     pub(crate) debug_options: DebugOptions,
+
+    // TODO - added
+    pub(crate) memory_export: *mut Memory,
 }
 
 unsafe impl Send for Plugin {}
@@ -109,11 +112,18 @@ impl Internal for Plugin {
         (&mut self.linker, &mut self.store)
     }
 
-    fn instance_and_store(&mut self) -> (&mut Instance, &mut Store<CurrentPlugin>) {
+    fn linker_and_store_and_instance(
+        &mut self,
+    ) -> (
+        &mut Linker<CurrentPlugin>,
+        &mut Store<CurrentPlugin>,
+        &mut Memory,
+    ) {
         unsafe {
             (
-                &mut *self.current_plugin_mut().current_instance,
+                &mut self.linker,
                 &mut self.store,
+                &mut *self.memory_export as &mut _
             )
         }
     }
@@ -270,7 +280,7 @@ impl Plugin {
             &engine,
             CurrentPlugin::new(manifest, with_wasi, available_pages, id)?,
         );
-        store.set_epoch_deadline(1);
+        // store.set_epoch_deadline(1);
 
         let mut linker = Linker::new(&engine);
         linker.allow_shadowing(true);
@@ -345,10 +355,12 @@ impl Plugin {
             store_needs_reset: false,
             debug_options,
             _functions: imports,
+            memory_export: std::ptr::null_mut() as *mut _
         };
 
         plugin.current_plugin_mut().store = &mut plugin.store;
         plugin.current_plugin_mut().linker = &mut plugin.linker;
+
         if available_pages.is_some() {
             plugin
                 .store
@@ -364,42 +376,39 @@ impl Plugin {
         instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
     ) -> Result<(), Error> {
         if self.store_needs_reset {
-            let engine = self.store.engine().clone();
-            let internal = self.current_plugin_mut();
-            self.store = Store::new(
-                &engine,
-                CurrentPlugin::new(
-                    internal.manifest.clone(),
-                    internal.wasi.is_some(),
-                    internal.available_pages,
-                    self.id,
-                )?,
-            );
-            self.store.set_epoch_deadline(1);
-            let store = &mut self.store as *mut _;
-            let linker = &mut self.linker as *mut _;
-            let current_instance = &mut self.instance.lock().unwrap().unwrap() as *mut _;
-        
-        
-            let current_plugin = self.current_plugin_mut();
-            current_plugin.store = store;
-            current_plugin.linker = linker;
-            current_plugin.current_instance = current_instance;
-            if current_plugin.available_pages.is_some() {
-                self.store
-                    .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
-            }
+            // let engine = self.store.engine().clone();
+            // let internal = self.current_plugin_mut();
+            // self.store = Store::new(
+            //     &engine,
+            //     CurrentPlugin::new(
+            //         internal.manifest.clone(),
+            //         internal.wasi.is_some(),
+            //         internal.available_pages,
+            //         self.id,
+            //     )?,
+            // );
+            // // self.store.set_epoch_deadline(1);
+            // let store = &mut self.store as *mut _;
+            // let linker = &mut self.linker as *mut _;
 
-            let main = &self.modules[MAIN_KEY];
-            for (name, module) in self.modules.iter() {
-                if name != MAIN_KEY {
-                    self.linker.module(&mut self.store, name, module)?;
-                }
-            }
-            self.instantiations = 0;
-            self.instance_pre = self.linker.instantiate_pre(main)?;
-            **instance_lock = None;
-            self.store_needs_reset = false;
+            // let current_plugin = self.current_plugin_mut();
+            // current_plugin.store = store;
+            // current_plugin.linker = linker;
+            // if current_plugin.available_pages.is_some() {
+            //     self.store
+            //         .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
+            // }
+
+            // let main = &self.modules[MAIN_KEY];
+            // for (name, module) in self.modules.iter() {
+            //     if name != MAIN_KEY {
+            //         self.linker.module(&mut self.store, name, module)?;
+            //     }
+            // }
+            // self.instantiations = 0;
+            // self.instance_pre = self.linker.instantiate_pre(main)?;
+            // **instance_lock = None;
+            // self.store_needs_reset = false;
         }
         Ok(())
     }
@@ -416,8 +425,19 @@ impl Plugin {
 
         let mut instance = self.instance_pre.instantiate(&mut self.store)?;
 
-        let current_instance = &mut instance as *mut _;
-        self.current_plugin_mut().current_instance = current_instance;
+        let mut current_instance = instance;
+        let mut store = &mut self.store;
+
+        let memory = instance.get_memory(&mut self.store, "memory").unwrap();
+        self.current_plugin_mut().memory_export = Box::into_raw(Box::new(memory));
+
+        // panic!("{:#?}", instance.get_memory(&mut self.store, "memory"));
+        // unsafe {
+        //     let instance_test = &mut *self.current_plugin_mut().instance.0;
+        //     let mut store_test = &mut *self.current_plugin_mut().instance.1;
+            
+        //     panic!("{:#?}", instance_test.get_memory(&mut store_test, "memory"));
+        // }
 
         trace!(
             plugin = self.id.to_string(),
@@ -457,43 +477,39 @@ impl Plugin {
 
     // Store input in memory and re-initialize `Internal` pointer
     pub(crate) fn set_input(&mut self, input: *const u8, mut len: usize) -> Result<(), Error> {
-        self.output = Output::default();
-        self.clear_error()?;
-        let id = self.id.to_string();
+        // self.output = Output::default();
+        // self.clear_error()?;
+        // let id = self.id.to_string();
 
-        if input.is_null() {
-            len = 0;
-        }
+        // if input.is_null() {
+        //     len = 0;
+        // }
 
-        {
-            let store = &mut self.store as *mut _;
-            let linker = &mut self.linker as *mut _;
+        // {
+        //     let store = &mut self.store as *mut _;
+        //     let linker = &mut self.linker as *mut _;
 
-        
-            let current_instance = &mut self.instance.lock().unwrap().unwrap() as *mut _;
-            
-            let current_plugin = self.current_plugin_mut();
-            current_plugin.store = store;
-            current_plugin.linker = linker;
-            current_plugin.current_instance = current_instance;
-        }
+        //     let current_plugin = self.current_plugin_mut();
+        //     current_plugin.store = store;
+        //     current_plugin.linker = linker;
+        // }
 
-        let bytes = unsafe { std::slice::from_raw_parts(input, len) };
-        debug!(plugin = &id, "input size: {}", bytes.len());
+        // let bytes = unsafe { std::slice::from_raw_parts(input, len) };
+        // debug!(plugin = &id, "input size: {}", bytes.len());
 
-        self.reset()?;
-        let handle = self.current_plugin_mut().memory_new(bytes)?;
+        // self.reset()?;
+        // let handle = self.current_plugin_mut().memory_new(bytes)?;
 
-        if let Some(f) = self
-            .linker
-            .get(&mut self.store, EXTISM_ENV_MODULE, "input_set")
-        {
-            f.into_func().unwrap().call(
-                &mut self.store,
-                &[Val::I64(handle.offset() as i64), Val::I64(len as i64)],
-                &mut [],
-            )?;
-        }
+        // if let Some(f) = self
+        //     .linker
+        //     .get(&mut self.store, EXTISM_ENV_MODULE, "input_set")
+        // {
+        //     f.into_func().unwrap().call(
+        //         &mut self.store,
+        //         &[Val::I64(handle.offset() as i64), Val::I64(len as i64)],
+        //         &mut [],
+        //     )?;
+        // }
 
         Ok(())
     }
@@ -679,11 +695,13 @@ impl Plugin {
         let name = name.as_ref();
         let input = input.as_ref();
 
-        if let Err(e) = self.reset_store(lock) {
-            error!(
-                plugin = self.id.to_string(),
-                "call to Plugin::reset_store failed: {e:?}"
-            );
+        if use_extism {
+            if let Err(e) = self.reset_store(lock) {
+                error!(
+                    plugin = self.id.to_string(),
+                    "call to Plugin::reset_store failed: {e:?}"
+                );
+            }
         }
 
         self.instantiate(lock).map_err(|e| (e, -1))?;
@@ -808,28 +826,28 @@ impl Plugin {
                     }
                 }
 
-                if let Some(file) = &self.debug_options.memdump.clone() {
-                    trace!(plugin = self.id.to_string(), "memory dump enabled");
-                    if let Some(memory) = self.current_plugin_mut().memory() {
-                        debug!(
-                            plugin = self.id.to_string(),
-                            "dumping memory to {}",
-                            file.display()
-                        );
-                        let data = memory.data(&mut self.store);
-                        if let Err(e) = std::fs::write(file, data) {
-                            error!(
-                                plugin = self.id.to_string(),
-                                "unable to write memory dump: {:?}", e
-                            );
-                        }
-                    } else {
-                        error!(
-                            plugin = self.id.to_string(),
-                            "unable to get extism memory for writing to disk",
-                        );
-                    }
-                }
+                // if let Some(file) = &self.debug_options.memdump.clone() {
+                //     trace!(plugin = self.id.to_string(), "memory dump enabled");
+                //     if let Some(memory) = self.current_plugin_mut().memory() {
+                //         debug!(
+                //             plugin = self.id.to_string(),
+                //             "dumping memory to {}",
+                //             file.display()
+                //         );
+                //         let data = memory.data(&mut self.store);
+                //         if let Err(e) = std::fs::write(file, data) {
+                //             error!(
+                //                 plugin = self.id.to_string(),
+                //                 "unable to write memory dump: {:?}", e
+                //             );
+                //         }
+                //     } else {
+                //         error!(
+                //             plugin = self.id.to_string(),
+                //             "unable to get extism memory for writing to disk",
+                //         );
+                //     }
+                // }
 
                 let wasi_exit_code = e
                     .downcast_ref::<wasmtime_wasi::I32Exit>()

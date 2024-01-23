@@ -18,7 +18,7 @@ pub(crate) trait Internal {
 
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>);
 
-    fn instance_and_store(&mut self) -> (&mut Instance, &mut Store<CurrentPlugin>);
+    fn linker_and_store_and_instance(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>, &mut Memory);
 
     fn current_plugin(&self) -> &CurrentPlugin {
         self.store().data()

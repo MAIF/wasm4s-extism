@@ -9,10 +9,13 @@ import org.extism.sdk.coraza.proxywasmhost.internal.imports.v2.ProxyWasmState;
 import org.extism.sdk.coraza.proxywasmhost.v2.Functions;
 import org.extism.sdk.coraza.proxywasmhost.v2.Types;
 import org.extism.sdk.manifest.Manifest;
+import org.extism.sdk.wasmotoroshi.LinearMemory;
+import org.extism.sdk.wasmotoroshi.LinearMemoryOptions;
 import org.extism.sdk.wasmotoroshi.Parameters;
 import org.extism.sdk.wasmotoroshi.Results;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 public class ProxyWasmPlugin {
 
@@ -106,7 +109,7 @@ public class ProxyWasmPlugin {
     }
 
     public ProxyWasmPlugin start() {
-        this.plugin = new Plugin(manifest, true, new Functions(vmData, state).all(), null);
+        this.plugin = new Plugin(manifest, true, new Functions(vmData, state).all());
         proxyStart();
         proxyCheckABIVersion();
 

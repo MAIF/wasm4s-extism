@@ -278,18 +278,20 @@ public class WasmOtoroshiTests {
                         resultsTypes,
                         (plugin, params, returns, data) -> {
                             System.out.println("Hello from Java Host Function!");
+
+//                            System.out.println(plugin.getLinearMemory("memory"));
                         },
                         Optional.empty()
                 ).withNamespace("env")
         };
 
-        var memory = new LinearMemory("memory", "env", new LinearMemoryOptions(1, Optional.empty()));
+//        var memory = new LinearMemory("memory", "env", new LinearMemoryOptions(1, Optional.empty()));
 
         try(var instance = new Plugin(manifest, true, functions, new LinearMemory[]{
-                memory
+//                memory
         })) {
-            var message = "foo bar message";
-            instance.writeBytes(message.getBytes(StandardCharsets.UTF_8), message.length(), 0, "env", "memory");
+//            var message = "foo bar message";
+//            instance.writeBytes(message.getBytes(StandardCharsets.UTF_8), message.length(), 0, "env", "memory");
 
             instance.call("execute", "".getBytes(StandardCharsets.UTF_8));
             System.out.println(instance.getMemorySize());

@@ -74,14 +74,14 @@ impl Timer {
                         TimerAction::Cancel { id } => {
                             trace!(plugin = id.to_string(), "handling cancel event");
                             if let Some((engine, _)) = plugins.remove(&id) {
-                                engine.increment_epoch();
+                                // engine.increment_epoch();
                             }
                         }
                         TimerAction::Shutdown => {
                             trace!("Shutting down timer");
                             for (id, (engine, _)) in plugins.iter() {
                                 trace!(plugin = id.to_string(), "handling shutdown event");
-                                engine.increment_epoch();
+                                // engine.increment_epoch();
                             }
                             return;
                         }
@@ -102,7 +102,7 @@ impl Timer {
                         if let Some(end) = end {
                             let now = std::time::Instant::now();
                             if end <= &now {
-                                engine.increment_epoch();
+                                // engine.increment_epoch();
                                 return false;
                             }
                         }

@@ -16,8 +16,7 @@ pub struct CurrentPlugin {
     pub(crate) memory_limiter: Option<MemoryLimiter>,
     pub(crate) id: uuid::Uuid,
 
-    // TODO - added
-    pub(crate) current_instance: *mut wasmtime::Instance
+    pub(crate) memory_export: *mut Memory,
 }
 
 unsafe impl Send for CurrentPlugin {}
@@ -331,7 +330,7 @@ impl CurrentPlugin {
             vars: BTreeMap::new(),
             linker: std::ptr::null_mut(),
             store: std::ptr::null_mut(),
-            current_instance: std::ptr::null_mut(),
+            memory_export: std::ptr::null_mut(),
             available_pages,
             memory_limiter,
             id,
@@ -445,6 +444,22 @@ impl CurrentPlugin {
         let length = self.memory_length(offs).unwrap_or_default();
         (offs, length)
     }
+
+    // TODO - added
+    pub(crate) fn get_memory(&mut self, name: String) -> *mut u8 {
+        unsafe {
+            // let instance = &mut *self.instance.0;
+            // let store = &mut *self.instance.1;
+            
+            // instance
+            //     .get_memory(&mut *store, &name)
+            // *self.memory_export
+            //     // .unwrap()
+            //     .data_mut(store)
+            //     .as_mut_ptr()
+            std::ptr::null_mut()
+        }
+    }
 }
 
 impl Internal for CurrentPlugin {
@@ -467,8 +482,14 @@ impl Internal for CurrentPlugin {
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>) {
         unsafe { (&mut *self.linker, &mut *self.store) }
     }
-    
-    fn instance_and_store(&mut self) -> (&mut Instance, &mut Store<CurrentPlugin>) {
-        unsafe { (&mut *self.current_instance, &mut *self.store) }
+
+    fn linker_and_store_and_instance(
+        &mut self,
+    ) -> (
+        &mut Linker<CurrentPlugin>,
+        &mut Store<CurrentPlugin>,
+        &mut Memory,
+    ) {
+        unsafe { (&mut *self.linker, &mut *self.store, (&mut *self.memory_export)) }
     }
 }

@@ -282,30 +282,31 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_linear_memory(
 ) -> *mut u8 {
     let plugin = &mut *plugin;
 
-    let (instance, mut store) = plugin.instance_and_store();
+    let (
+        linker, 
+        store, 
+        instance) = plugin.linker_and_store_and_instance();
 
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
         Ok(x) => x.to_string(),
         Err(_e) => return std::ptr::null_mut(),
     };
 
-    panic!("{:#?}", instance.exports(&mut store).map(|f| f.name()).collect::<Vec<_>>().join(" "));
-
     // let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
     //     Ok(x) => x.to_string(),
     //     Err(_) => EXTISM_ENV_MODULE.to_string(),
     // };
 
-    // let instance = *plugin.current_instance;
-    // let store = &mut *plugin.store;
-
-    if let Some(memory) = instance.get_memory(&mut store, &name) {
-        memory.data_mut(store).as_mut_ptr()
-    } else {
-        std::ptr::null_mut()
-    }
+    plugin.get_memory(name)
 
     // let namespace = "";
+
+    // match instance.unwrap().get_memory(store, "memory") {
+    //     None => std::ptr::null_mut(),
+    //     Some(external) => 
+    //     panic!("HERE")
+    //     //external.data_mut(&mut *store).as_mut_ptr()
+    // }
 
     // match (&mut *linker).get(&mut *store, &namespace, &name) {
     //     None => std::ptr::null_mut(),
