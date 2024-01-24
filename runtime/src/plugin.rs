@@ -353,7 +353,7 @@ impl Plugin {
     // Resets the store and linker to avoid running into Wasmtime memory limits
     pub(crate) fn reset_store(
         &mut self,
-        instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
+        _instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
     ) -> Result<(), Error> {
         if self.store_needs_reset {
             // let engine = self.store.engine().clone();
@@ -779,7 +779,6 @@ impl Plugin {
         match res {
             Ok(()) => Ok(rc),
             Err(e) => {
-                panic!("{:#?}", e);
                 if let Some(coredump) = e.downcast_ref::<wasmtime::WasmCoreDump>() {
                     if let Some(file) = self.debug_options.coredump.clone() {
                         debug!(
@@ -799,28 +798,28 @@ impl Plugin {
                     }
                 }
 
-                // if let Some(file) = &self.debug_options.memdump.clone() {
-                //     trace!(plugin = self.id.to_string(), "memory dump enabled");
-                //     if let Some(memory) = self.current_plugin_mut().memory() {
-                //         debug!(
-                //             plugin = self.id.to_string(),
-                //             "dumping memory to {}",
-                //             file.display()
-                //         );
-                //         let data = memory.data(&mut self.store);
-                //         if let Err(e) = std::fs::write(file, data) {
-                //             error!(
-                //                 plugin = self.id.to_string(),
-                //                 "unable to write memory dump: {:?}", e
-                //             );
-                //         }
-                //     } else {
-                //         error!(
-                //             plugin = self.id.to_string(),
-                //             "unable to get extism memory for writing to disk",
-                //         );
-                //     }
-                // }
+                if let Some(file) = &self.debug_options.memdump.clone() {
+                    trace!(plugin = self.id.to_string(), "memory dump enabled");
+                    if let Some(memory) = self.current_plugin_mut().memory() {
+                        debug!(
+                            plugin = self.id.to_string(),
+                            "dumping memory to {}",
+                            file.display()
+                        );
+                        let data = memory.data(&mut self.store);
+                        if let Err(e) = std::fs::write(file, data) {
+                            error!(
+                                plugin = self.id.to_string(),
+                                "unable to write memory dump: {:?}", e
+                            );
+                        }
+                    } else {
+                        error!(
+                            plugin = self.id.to_string(),
+                            "unable to get extism memory for writing to disk",
+                        );
+                    }
+                }
 
                 let wasi_exit_code = e
                     .downcast_ref::<wasmtime_wasi::I32Exit>()

@@ -33,9 +33,9 @@ pub(crate) unsafe fn wasm_otoroshi_plugin_call_native(
 
     match res {
         Err((e, _rc)) => {
-            panic!("{:#?} {} {:#?}", e, _rc, results);
-            // plugin.return_error(&mut lock, e, None)
-            Some(results)
+            // panic!("{:#?} {} {:#?}", e, _rc, results);
+            plugin.return_error(&mut lock, e, None)
+            // Some(results)
         }
         Ok(_x) => Some(results),
     }
