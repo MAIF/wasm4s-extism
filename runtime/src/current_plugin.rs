@@ -1,5 +1,7 @@
 use crate::*;
 
+use self::otoroshi::custom_memory::PluginMemory;
+
 /// CurrentPlugin stores data that is available to the caller in PDK functions, this should
 /// only be accessed from inside a host function
 pub struct CurrentPlugin {
@@ -16,7 +18,7 @@ pub struct CurrentPlugin {
     pub(crate) memory_limiter: Option<MemoryLimiter>,
     pub(crate) id: uuid::Uuid,
 
-    pub(crate) memory_export: *mut Memory,
+    pub(crate) memory_export: *mut PluginMemory,
 }
 
 unsafe impl Send for CurrentPlugin {}
@@ -444,22 +446,6 @@ impl CurrentPlugin {
         let length = self.memory_length(offs).unwrap_or_default();
         (offs, length)
     }
-
-    // TODO - added
-    pub(crate) fn get_memory(&mut self, name: String) -> *mut u8 {
-        unsafe {
-            // let instance = &mut *self.instance.0;
-            // let store = &mut *self.instance.1;
-            
-            // instance
-            //     .get_memory(&mut *store, &name)
-            // *self.memory_export
-            //     // .unwrap()
-            //     .data_mut(store)
-            //     .as_mut_ptr()
-            std::ptr::null_mut()
-        }
-    }
 }
 
 impl Internal for CurrentPlugin {
@@ -481,15 +467,5 @@ impl Internal for CurrentPlugin {
 
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>) {
         unsafe { (&mut *self.linker, &mut *self.store) }
-    }
-
-    fn linker_and_store_and_instance(
-        &mut self,
-    ) -> (
-        &mut Linker<CurrentPlugin>,
-        &mut Store<CurrentPlugin>,
-        &mut Memory,
-    ) {
-        unsafe { (&mut *self.linker, &mut *self.store, (&mut *self.memory_export)) }
     }
 }

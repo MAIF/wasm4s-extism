@@ -1,6 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::os::raw::c_char;
+use std::{collections::BTreeMap, mem, os::raw::c_char};
 
 use crate::{
     function,
@@ -222,10 +222,13 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
 
     let data = std::slice::from_raw_parts(data, data_size as usize);
 
-    let ns = std::ffi::CStr::from_ptr(namespace);
-    let ns = match ns.to_str() {
-        Ok(name) => name,
-        Err(_e) => EXTISM_ENV_MODULE,
+    let ns = if namespace.is_null() {
+        ""
+    }  else {
+        match std::ffi::CStr::from_ptr(namespace).to_str() {
+            Ok(name) => name,
+            Err(_e) => EXTISM_ENV_MODULE,
+        }
     };
 
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
@@ -282,39 +285,48 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_linear_memory(
 ) -> *mut u8 {
     let plugin = &mut *plugin;
 
-    let (
-        linker, 
-        store, 
-        instance) = plugin.linker_and_store_and_instance();
-
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
         Ok(x) => x.to_string(),
         Err(_e) => return std::ptr::null_mut(),
     };
 
-    // let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
-    //     Ok(x) => x.to_string(),
-    //     Err(_) => EXTISM_ENV_MODULE.to_string(),
-    // };
+    let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
+        Ok(x) => x.to_string(),
+        Err(_) => EXTISM_ENV_MODULE.to_string(),
+    };
 
-    plugin.get_memory(name)
+    // let (linker, mut store) = plugin.linker_and_store();
 
-    // let namespace = "";
+    // let memory = store.data().memory_export;
+    // let memory = *memory;
 
-    // match instance.unwrap().get_memory(store, "memory") {
-    //     None => std::ptr::null_mut(),
-    //     Some(external) => 
-    //     panic!("HERE")
-    //     //external.data_mut(&mut *store).as_mut_ptr()
-    // }
+    // let current = store;
+    // Box::into_raw(Box::new(*current.memory_export))
+
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.memory_export;
+
+    plugin_memory.memory.data_mut(&mut *plugin_memory.store).as_mut_ptr()
+
+    // panic!("{:p}", &*current.memory_export);
+    // let _mem = current.memory_export;
+
+    
+    // let memory = plugin.memory().unwrap();
+    // memory.data_mut(&mut store).as_mut_ptr()
+
+    // let (linker, mut store) = plugin.linker_and_store();
 
     // match (&mut *linker).get(&mut *store, &namespace, &name) {
     //     None => std::ptr::null_mut(),
     //     Some(external) => match external.into_memory() {
     //         None => std::ptr::null_mut(),
-    //         Some(memory) => memory.data_mut(&mut *store).as_mut_ptr(),
-    //     }
+    //         Some(memory) => {
+    //             memory.data_mut(&mut store).as_mut_ptr()
+    //         }
+    //     },
     // }
+
 }
 
 #[no_mangle]

@@ -12,27 +12,19 @@ public class ExtismCurrentPlugin {
     }
 
     public Pointer memory() {
-        return LibExtism.INSTANCE.extism_current_plugin_memory(this.pointer);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_linear_memory(this.pointer);
     }
 
     public int alloc(int n) {
-        return LibExtism.INSTANCE.extism_current_plugin_memory_alloc(this.pointer, n);
-    }
-
-    public Pointer getLinearMemory(String memoryName) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_linear_memory(this.pointer, memoryName, "env");
-    }
-
-    public Pointer getLinearMemory(String memoryName, String namespace) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_linear_memory(this.pointer, memoryName, namespace);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_current_plugin_memory_alloc(this.pointer, n);
     }
 
     public void free(long offset) {
-        LibExtism.INSTANCE.extism_current_plugin_memory_free(this.pointer, offset);
+        LibExtism.INSTANCE.wasm_otoroshi_extism_current_plugin_memory_free(this.pointer, offset);
     }
 
     public long memoryLength(long offset) {
-        return LibExtism.INSTANCE.extism_current_plugin_memory_length(this.pointer, offset);
+        return LibExtism.INSTANCE.wasm_otoroshi_extism_current_plugin_memory_length(this.pointer, offset);
     }
 
     /**

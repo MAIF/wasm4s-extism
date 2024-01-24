@@ -110,7 +110,9 @@ public class ProxyWasmPlugin {
 
     public ProxyWasmPlugin start() {
         this.plugin = new Plugin(manifest, true, new Functions(vmData, state).all());
+
         proxyStart();
+
         proxyCheckABIVersion();
 
         // according to ABI, we should create a root context id before any operations

@@ -261,6 +261,7 @@ public class Plugin implements AutoCloseable {
 
     @Override
     public void close() {
+        System.out.println("FREE PLUGIN HAPPENED");
         free();
     }
 

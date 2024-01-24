@@ -34,9 +34,9 @@ public enum TestWasmSources {
         public Path getOPAPath() { return Paths.get(WASM_LOCATION, "OPA_POLICY-1.0.0-dev.wasm"); }
 
         public Path getWasmWaf() {
-//            return Paths.get(WASM_LOCATION, "coraza-proxy-wasm-v0.1.2.wasm");
+            return Paths.get(WASM_LOCATION, "coraza-proxy-wasm-v0.1.2.wasm");
 //            return Paths.get(WASM_LOCATION, "coraza.wasm");
-            return Paths.get(WASM_LOCATION, "../../../../../coraza-proxy-wasm/build/mainraw.wasm");
+//            return Paths.get(WASM_LOCATION, "../../../../../coraza-proxy-wasm/build/mainraw.wasm");
         }
     };
 

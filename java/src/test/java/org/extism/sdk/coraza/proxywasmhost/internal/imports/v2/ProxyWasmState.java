@@ -142,7 +142,7 @@ public class ProxyWasmState implements Api {
             return ResultBadArgument;
         }
 
-        Pointer memory = plugin.getLinearMemory("memory", "extism:host/env");
+        Pointer memory = plugin.memory();
 
         byte[] content = new byte[bufferSize];
         memory.read(bufferData, content, 0, bufferSize);
@@ -233,7 +233,7 @@ public class ProxyWasmState implements Api {
 //            return int32(v2.ResultInvalidMemoryAccess)
 //        }
 
-        Pointer memory = plugin.getLinearMemory("memory", "extism:host/env");
+        Pointer memory = plugin.memory();
 
         memory.setInt(addr, cloneMap.size());
 //        if err != nil {
@@ -566,8 +566,6 @@ public class ProxyWasmState implements Api {
                 DEBUG("proxy_get_property", path + " : " + value);
             }
 
-
-
             if (value == null) {
                 return ResultNotFound;
             }
@@ -679,7 +677,7 @@ public class ProxyWasmState implements Api {
 
     @Override
     public Either<Types.Error, Map.Entry<Pointer, byte[]>> GetMemory(ExtismCurrentPlugin plugin, VMData vmData, int addr, int size) {
-        Pointer memory = plugin.getLinearMemory("memory", "extism:host/env");
+        Pointer memory = plugin.memory();
         if (memory == null) {
             return Either.left(Types.Error.ErrorExportsNotFound);
         }
@@ -695,7 +693,7 @@ public class ProxyWasmState implements Api {
 
     @Override
     public Either<Types.Error, Pointer> GetMemory(ExtismCurrentPlugin plugin, VMData vmData) {
-        Pointer memory = plugin.getLinearMemory("memory", "extism:host/env");
+        Pointer memory = plugin.memory();
         if (memory == null) {
             return Either.left(Types.Error.ErrorExportsNotFound);
         }

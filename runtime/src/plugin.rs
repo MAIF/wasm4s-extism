@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
-use crate::{otoroshi::WasmMemory, *};
+use crate::{otoroshi::{custom_memory::PluginMemory, WasmMemory}, *};
 
 pub const EXTISM_ENV_MODULE: &str = "extism:host/env";
 pub const EXTISM_USER_MODULE: &str = "extism:host/user";
@@ -77,9 +77,6 @@ pub struct Plugin {
     pub(crate) store_needs_reset: bool,
 
     pub(crate) debug_options: DebugOptions,
-
-    // TODO - added
-    pub(crate) memory_export: *mut Memory,
 }
 
 unsafe impl Send for Plugin {}
@@ -110,22 +107,6 @@ impl Internal for Plugin {
 
     fn linker_and_store(&mut self) -> (&mut Linker<CurrentPlugin>, &mut Store<CurrentPlugin>) {
         (&mut self.linker, &mut self.store)
-    }
-
-    fn linker_and_store_and_instance(
-        &mut self,
-    ) -> (
-        &mut Linker<CurrentPlugin>,
-        &mut Store<CurrentPlugin>,
-        &mut Memory,
-    ) {
-        unsafe {
-            (
-                &mut self.linker,
-                &mut self.store,
-                &mut *self.memory_export as &mut _
-            )
-        }
     }
 }
 
@@ -241,7 +222,7 @@ impl Plugin {
         // Setup wasmtime types
         let mut config = Config::new();
         config
-            .epoch_interruption(true)
+            // .epoch_interruption(true)
             .debug_info(debug_options.debug_info)
             .coredump_on_trap(debug_options.coredump.is_some())
             .profiler(debug_options.profiling_strategy)
@@ -354,8 +335,7 @@ impl Plugin {
             output: Output::default(),
             store_needs_reset: false,
             debug_options,
-            _functions: imports,
-            memory_export: std::ptr::null_mut() as *mut _
+            _functions: imports
         };
 
         plugin.current_plugin_mut().store = &mut plugin.store;
@@ -423,21 +403,14 @@ impl Plugin {
             return Ok(());
         }
 
-        let mut instance = self.instance_pre.instantiate(&mut self.store)?;
-
-        let mut current_instance = instance;
-        let mut store = &mut self.store;
+        let instance = self.instance_pre.instantiate(&mut self.store)?;
 
         let memory = instance.get_memory(&mut self.store, "memory").unwrap();
-        self.current_plugin_mut().memory_export = Box::into_raw(Box::new(memory));
 
-        // panic!("{:#?}", instance.get_memory(&mut self.store, "memory"));
-        // unsafe {
-        //     let instance_test = &mut *self.current_plugin_mut().instance.0;
-        //     let mut store_test = &mut *self.current_plugin_mut().instance.1;
-            
-        //     panic!("{:#?}", instance_test.get_memory(&mut store_test, "memory"));
-        // }
+        let store = &mut self.store as *mut _;
+        self.current_plugin_mut().memory_export = Box::into_raw(Box::new(
+            PluginMemory::new(store, memory)
+        ));
 
         trace!(
             plugin = self.id.to_string(),
