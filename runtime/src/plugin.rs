@@ -450,39 +450,39 @@ impl Plugin {
 
     // Store input in memory and re-initialize `Internal` pointer
     pub(crate) fn set_input(&mut self, input: *const u8, mut len: usize) -> Result<(), Error> {
-        // self.output = Output::default();
-        // self.clear_error()?;
-        // let id = self.id.to_string();
+        self.output = Output::default();
+        self.clear_error()?;
+        let id = self.id.to_string();
 
-        // if input.is_null() {
-        //     len = 0;
-        // }
+        if input.is_null() {
+            len = 0;
+        }
 
-        // {
-        //     let store = &mut self.store as *mut _;
-        //     let linker = &mut self.linker as *mut _;
+        {
+            let store = &mut self.store as *mut _;
+            let linker = &mut self.linker as *mut _;
 
-        //     let current_plugin = self.current_plugin_mut();
-        //     current_plugin.store = store;
-        //     current_plugin.linker = linker;
-        // }
+            let current_plugin = self.current_plugin_mut();
+            current_plugin.store = store;
+            current_plugin.linker = linker;
+        }
 
-        // let bytes = unsafe { std::slice::from_raw_parts(input, len) };
-        // debug!(plugin = &id, "input size: {}", bytes.len());
+        let bytes = unsafe { std::slice::from_raw_parts(input, len) };
+        debug!(plugin = &id, "input size: {}", bytes.len());
 
-        // self.reset()?;
-        // let handle = self.current_plugin_mut().memory_new(bytes)?;
+        self.reset()?;
+        let handle = self.current_plugin_mut().memory_new(bytes)?;
 
-        // if let Some(f) = self
-        //     .linker
-        //     .get(&mut self.store, EXTISM_ENV_MODULE, "input_set")
-        // {
-        //     f.into_func().unwrap().call(
-        //         &mut self.store,
-        //         &[Val::I64(handle.offset() as i64), Val::I64(len as i64)],
-        //         &mut [],
-        //     )?;
-        // }
+        if let Some(f) = self
+            .linker
+            .get(&mut self.store, EXTISM_ENV_MODULE, "input_set")
+        {
+            f.into_func().unwrap().call(
+                &mut self.store,
+                &[Val::I64(handle.offset() as i64), Val::I64(len as i64)],
+                &mut [],
+            )?;
+        }
 
         Ok(())
     }

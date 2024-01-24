@@ -71,75 +71,6 @@ impl PluginMemory {
         unsafe { &*self.store }
     }
 
-    fn as_store_mut(&mut self) -> &mut Store<CurrentPlugin> {
-        unsafe { &mut *self.store }
-    }
-
-    /// Write byte to memory
-    pub(crate) fn store_u8(&mut self, offs: usize, data: u8) -> Result<(), MemoryAccessError> {
-        if offs >= self.size() {
-            // This should raise MemoryAccessError
-            let buf = &mut [0];
-            self.memory.read(&self.store(), offs, buf)?;
-            return Ok(());
-        }
-        unsafe {
-            self.memory.data_mut(&mut *self.store)[offs] = data;
-        }
-        Ok(())
-    }
-
-    /// Read byte from memory
-    pub(crate) fn load_u8(&self, offs: usize) -> Result<u8, MemoryAccessError> {
-        if offs >= self.size() {
-            // This should raise MemoryAccessError
-            let buf = &mut [0];
-            self.memory.read(&self.store(), offs, buf)?;
-            return Ok(0);
-        }
-        Ok(self.memory.data(&self.store())[offs])
-    }
-
-    /// Write u64 to memory
-    pub(crate) fn store_u64(&mut self, offs: usize, data: u64) -> Result<(), Error> {
-        let handle = MemoryBlock {
-            offset: offs,
-            length: 8,
-        };
-        self.write(handle, data.to_ne_bytes())?;
-        Ok(())
-    }
-
-    /// Read u64 from memory
-    pub(crate) fn load_u64(&self, offs: usize) -> Result<u64, Error> {
-        let mut buf = [0; 8];
-        let handle = MemoryBlock {
-            offset: offs,
-            length: 8,
-        };
-        self.read(handle, &mut buf)?;
-        Ok(u64::from_ne_bytes(buf))
-    }
-
-    /// Write slice to memory
-    pub fn write(&mut self, pos: impl ToMemoryBlock, data: impl AsRef<[u8]>) -> Result<(), Error> {
-        let pos = pos.to_memory_block(self)?;
-        assert!(data.as_ref().len() <= pos.length);
-        unsafe {
-            self.memory
-                .write(&mut *self.store, pos.offset, data.as_ref())?;
-        }
-        Ok(())
-    }
-
-    /// Read slice from memory
-    pub fn read(&self, pos: impl ToMemoryBlock, mut data: impl AsMut<[u8]>) -> Result<(), Error> {
-        let pos = pos.to_memory_block(self)?;
-        assert!(data.as_mut().len() <= pos.length);
-        self.memory.read(&self.store(), pos.offset, data.as_mut())?;
-        Ok(())
-    }
-
     /// Size of memory in bytes
     pub fn size(&self) -> usize {
         self.memory.data_size(&self.store())
@@ -193,13 +124,6 @@ impl PluginMemory {
         Ok(mem)
     }
 
-    /// Allocate and copy `data` into the wasm memory
-    pub fn alloc_bytes(&mut self, data: impl AsRef<[u8]>) -> Result<MemoryBlock, Error> {
-        let handle = self.alloc(data.as_ref().len())?;
-        self.write(handle, data)?;
-        Ok(handle)
-    }
-
     /// Free the block allocated at `offset`
     pub fn free(&mut self, offset: usize) {
         if let Some(length) = self.live_blocks.remove(&offset) {
@@ -241,28 +165,6 @@ impl PluginMemory {
         self.position = 1;
     }
 
-    /// Get bytes occupied by the provided memory handle
-    pub fn get(&self, handle: impl ToMemoryBlock) -> Result<&[u8], Error> {
-        let handle = handle.to_memory_block(self)?;
-        unsafe { Ok(&self.memory.data(&*self.store)[handle.offset..handle.offset + handle.length]) }
-    }
-
-    /// Get str occupied by the provided memory handle
-    pub fn get_str(&self, handle: impl ToMemoryBlock) -> Result<&str, Error> {
-        let handle = handle.to_memory_block(self)?;
-        unsafe {
-            Ok(std::str::from_utf8(
-                &self.memory.data(&*self.store)[handle.offset..handle.offset + handle.length],
-            )?)
-        }
-    }
-
-    /// Pointer to the provided memory handle
-    pub fn ptr(&self, handle: impl ToMemoryBlock) -> Result<*mut u8, Error> {
-        let handle = handle.to_memory_block(self)?;
-        Ok(unsafe { self.memory.data_ptr(&self.store()).add(handle.offset) })
-    }
-
     /// Get the length of the block starting at `offs`
     pub fn block_length(&self, offs: usize) -> Option<usize> {
         self.live_blocks.get(&offs).cloned()
@@ -287,11 +189,5 @@ impl From<(usize, usize)> for MemoryBlock {
             offset: x.0,
             length: x.1,
         }
-    }
-}
-
-impl MemoryBlock {
-    pub fn new(offset: usize, length: usize) -> Self {
-        MemoryBlock { offset, length }
     }
 }

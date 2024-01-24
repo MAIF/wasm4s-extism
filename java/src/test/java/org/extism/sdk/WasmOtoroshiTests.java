@@ -223,7 +223,22 @@ public class WasmOtoroshiTests {
                         "    }\n" +
                         "}");
 
-        System.out.println("Result is : " + result);
+        assertEquals("[{\"result\":true}]", result);
+
+        opa.reset();
+
+        result = opa.evaluate(
+                (int)values.toArray()[0],
+                (int)values.toArray()[1],
+                "{\n" +
+                        "    \"request\": {\n" +
+                        "        \"headers\": {\n" +
+                        "            \"foo\": \"asdas\"\n" +
+                        "        }\n" +
+                        "    }\n" +
+                        "}");
+
+        assertEquals("[{\"result\":false}]", result);
     }
 
 //    @Test

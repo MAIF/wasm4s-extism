@@ -1,12 +1,12 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::{collections::BTreeMap, mem, os::raw::c_char};
+use std::os::raw::c_char;
 
 use crate::{
     function,
     otoroshi::*,
     sdk::{ExtismFunction, ExtismVal, Size},
-    CurrentPlugin, Plugin, EXTISM_ENV_MODULE, Internal,
+    CurrentPlugin, Internal, Plugin, EXTISM_ENV_MODULE,
 };
 
 use super::wasm_memory::ExtismMemory;
@@ -188,23 +188,14 @@ pub(crate) unsafe extern "C" fn wasm_otoroshi_create_wasmtime_memory(
 
 /// Remove all plugins from the registry
 #[no_mangle]
-pub unsafe extern "C" fn extism_reset(
-    instance_ptr: *mut Plugin
-) {
-    let plugin = &mut *instance_ptr;
-    // let mut lock = plugin.instance.lock().unwrap();
+pub unsafe extern "C" fn custom_memory_reset(plugin: *mut Plugin) {
+    if plugin.is_null() {
+        return;
+    }
 
-    plugin.store_needs_reset = true;
-
-    // plugin.reset_store(&mut lock);
-
-    // let linker = &mut plugin.linker;
-    // let mut store = &mut plugin.store;
-
-    // let mut instance = lock.unwrap();
-
-    // let mem = instance.get_memory(store, "memory").unwrap();
-
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.current_plugin().memory_export;
+    plugin_memory.reset();
 }
 
 #[no_mangle]
@@ -214,7 +205,7 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
     data_size: Size,
     offset: u32,
     namespace: *const c_char,
-    name: *const c_char
+    name: *const c_char,
 ) -> i8 {
     let plugin = &mut *instance_ptr;
 
@@ -224,7 +215,7 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
 
     let ns = if namespace.is_null() {
         ""
-    }  else {
+    } else {
         match std::ffi::CStr::from_ptr(namespace).to_str() {
             Ok(name) => name,
             Err(_e) => EXTISM_ENV_MODULE,
@@ -249,7 +240,7 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_memory_write_bytes(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
+pub unsafe extern "C" fn linear_memory_get(
     plugin: *mut Plugin,
     name: *const std::ffi::c_char,
     namespace: *const std::ffi::c_char,
@@ -278,72 +269,137 @@ pub unsafe extern "C" fn wasm_otoroshi_extism_get_memory(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wasm_otoroshi_extism_get_linear_memory(
-    plugin: *mut CurrentPlugin,
-    name: *const std::ffi::c_char,
-    namespace: *const std::ffi::c_char,
-) -> *mut u8 {
-    let plugin = &mut *plugin;
+pub unsafe extern "C" fn linear_memory_size(
+    instance_ptr: *mut Plugin,
+    namespace: *const c_char,
+    name: *const c_char
+) -> usize {
+    let plugin = &mut *instance_ptr;
+
+    let (linker, store) = plugin.linker_and_store();
 
     let name = match std::ffi::CStr::from_ptr(name).to_str() {
-        Ok(x) => x.to_string(),
-        Err(_e) => return std::ptr::null_mut(),
+        Ok(name) => name,
+        Err(_e) => "",
     };
 
     let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
-        Ok(x) => x.to_string(),
-        Err(_) => EXTISM_ENV_MODULE.to_string(),
+        Ok(namespace) => namespace,
+        Err(_e) => "",
     };
 
-    // let (linker, mut store) = plugin.linker_and_store();
+    match (&mut *linker).get(&mut *store, &namespace, &name) {
+        None => 0 as usize,
+        Some(external) => match external.into_memory() {
+            None => 0 as usize,
+            Some(memory) => memory
+                .data(&mut *store)
+                .iter()
+                .position(|x| x.to_owned() == 0)
+                .unwrap(),
+        },
+    }
+}
 
-    // let memory = store.data().memory_export;
-    // let memory = *memory;
+#[no_mangle]
+pub unsafe extern "C" fn linear_memory_reset(
+    instance_ptr: *mut Plugin,
+    namespace: *const c_char,
+    name: *const c_char,
+) -> usize {
+    let plugin = &mut *instance_ptr;
 
-    // let current = store;
-    // Box::into_raw(Box::new(*current.memory_export))
+    let (linker, store) = plugin.linker_and_store();
+
+    let name = match std::ffi::CStr::from_ptr(name).to_str() {
+        Ok(name) => name,
+        Err(_e) => "",
+    };
+
+    let namespace = match std::ffi::CStr::from_ptr(namespace).to_str() {
+        Ok(namespace) => namespace,
+        Err(_e) => "",
+    };
+
+    match (&mut *linker).get(&mut *store, namespace, &name) {
+        None => 0 as usize,
+        Some(external) => match external.into_memory() {
+            None => 0 as usize,
+            Some(memory) => memory
+                .data(&mut *store)
+                .iter()
+                .position(|x| x.to_owned() == 0)
+                .unwrap(),
+        },
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn custom_memory_get(plugin: *mut CurrentPlugin) -> *mut u8 {
+    let plugin = &mut *plugin;
 
     let plugin = &mut *plugin;
     let plugin_memory = &mut *plugin.memory_export;
 
-    plugin_memory.memory.data_mut(&mut *plugin_memory.store).as_mut_ptr()
-
-    // panic!("{:p}", &*current.memory_export);
-    // let _mem = current.memory_export;
-
-    
-    // let memory = plugin.memory().unwrap();
-    // memory.data_mut(&mut store).as_mut_ptr()
-
-    // let (linker, mut store) = plugin.linker_and_store();
-
-    // match (&mut *linker).get(&mut *store, &namespace, &name) {
-    //     None => std::ptr::null_mut(),
-    //     Some(external) => match external.into_memory() {
-    //         None => std::ptr::null_mut(),
-    //         Some(memory) => {
-    //             memory.data_mut(&mut store).as_mut_ptr()
-    //         }
-    //     },
-    // }
-
+    plugin_memory
+        .memory
+        .data_mut(&mut *plugin_memory.store)
+        .as_mut_ptr()
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn wasm_otoroshi_extism_memory_bytes(
-    instance_ptr: *mut Plugin,
-) -> usize {
-    let plugin = &mut *instance_ptr;
-    
-    let (linker, store) = plugin.linker_and_store();
+pub unsafe extern "C" fn custom_memory_size(plugin: *mut CurrentPlugin) -> usize {
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.memory_export;
 
-    match (&mut *linker).get(&mut *store, "env", "memory") {
-        None => 0 as usize,
-        Some(external) => match external.into_memory() {
-            None => 0 as usize,
-            Some(memory) => memory.data(&mut *store).iter().position(|x| x.to_owned() == 0).unwrap(),
-        },
+    plugin_memory
+        .memory
+        .data(&mut *plugin_memory.store)
+        .iter()
+        .position(|x| x.to_owned() == 0)
+        .unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn custom_memory_length(plugin: *mut CurrentPlugin, n: Size) -> Size {
+    if plugin.is_null() {
+        return 0;
     }
+
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.memory_export;
+
+    match plugin_memory.block_length(n as usize) {
+        Some(x) => x as Size,
+        None => 0,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn custom_memory_free(plugin: *mut CurrentPlugin, ptr: u64) {
+    if plugin.is_null() {
+        return;
+    }
+
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.memory_export;
+    plugin_memory.free(ptr as usize);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn custom_memory_alloc(plugin: *mut CurrentPlugin, n: Size) -> u64 {
+    if plugin.is_null() {
+        return 0;
+    }
+
+    let plugin = &mut *plugin;
+    let plugin_memory = &mut *plugin.memory_export;
+    let mem = match plugin_memory.alloc(n as usize) {
+        Ok(x) => x,
+        Err(_e) => return 0,
+    };
+
+    mem.offset as u64
 }
 
 #[no_mangle]

@@ -275,19 +275,19 @@ public interface LibExtism extends Library {
 
     Pointer wasm_otoroshi_extism_get_linear_memory(Pointer instance, String memoryName, String namespace);
 
-    Pointer wasm_otoroshi_extism_get_linear_memory(Pointer instance);
-
-    // TODO - ADDED
-//    void extism_reset(Pointer pluginPointer);
     // TODO - ADDED
     int wasm_otoroshi_extism_memory_bytes(Pointer pluginPointer);
 
     // TODO - ADDED
-    int wasm_otoroshi_extism_current_plugin_memory_length(Pointer plugin, long n);
+    Pointer custom_memory_get(Pointer plugin);
+    int custom_memory_length(Pointer plugin, long n);
+    int custom_memory_alloc(Pointer plugin, long n);
+    void custom_memory_free(Pointer plugin, long ptr);
+    void custom_memory_size(Pointer plugin);
 
-    Pointer wasm_otoroshi_extism_current_plugin_memory(Pointer plugin);
-
-    int wasm_otoroshi_extism_current_plugin_memory_alloc(Pointer plugin, long n);
-
-    void wasm_otoroshi_extism_current_plugin_memory_free(Pointer plugin, long ptr);
+    Pointer linear_memory_get(Pointer plugin, String namespace, String name);
+    int linear_memory_size(Pointer plugin, String namespace, String name, long n);
+    void linear_memory_reset(Pointer plugin, String namespace, String name);
+//    int linear_memory_alloc(Pointer plugin, String namespace, String name, long n);
+//    void linear_memory_free(Pointer plugin, String namespace, String name, long ptr);
 }

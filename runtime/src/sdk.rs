@@ -1,6 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::{any::Any, os::raw::c_char};
+use std::os::raw::c_char;
 
 use crate::*;
 

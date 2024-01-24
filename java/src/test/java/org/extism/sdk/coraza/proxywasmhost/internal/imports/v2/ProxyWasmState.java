@@ -142,7 +142,7 @@ public class ProxyWasmState implements Api {
             return ResultBadArgument;
         }
 
-        Pointer memory = plugin.memory();
+        Pointer memory = plugin.customMemoryGet();
 
         byte[] content = new byte[bufferSize];
         memory.read(bufferData, content, 0, bufferSize);
@@ -226,14 +226,14 @@ public class ProxyWasmState implements Api {
         }
 
         // TODO - try to call proxy_on_memory_allocate
-        int addr = plugin.alloc(totalBytesLen);
+        int addr = plugin.customMemoryAlloc(totalBytesLen);
 
         // TODO - manage error
 //        if err != nil {
 //            return int32(v2.ResultInvalidMemoryAccess)
 //        }
 
-        Pointer memory = plugin.memory();
+        Pointer memory = plugin.customMemoryGet();
 
         memory.setInt(addr, cloneMap.size());
 //        if err != nil {
@@ -467,7 +467,7 @@ public class ProxyWasmState implements Api {
 
     @Override
     public Types.Result copyIntoInstance(ExtismCurrentPlugin plugin, Pointer memory, IoBuffer value, int retPtr, int retSize) {
-        int addr = plugin.alloc(value.length());
+        int addr = plugin.customMemoryAlloc(value.length());
 
         memory.write(addr, value.bytes(), 0, value.length());
 
@@ -677,7 +677,7 @@ public class ProxyWasmState implements Api {
 
     @Override
     public Either<Types.Error, Map.Entry<Pointer, byte[]>> GetMemory(ExtismCurrentPlugin plugin, VMData vmData, int addr, int size) {
-        Pointer memory = plugin.memory();
+        Pointer memory = plugin.customMemoryGet();
         if (memory == null) {
             return Either.left(Types.Error.ErrorExportsNotFound);
         }
@@ -693,7 +693,7 @@ public class ProxyWasmState implements Api {
 
     @Override
     public Either<Types.Error, Pointer> GetMemory(ExtismCurrentPlugin plugin, VMData vmData) {
-        Pointer memory = plugin.memory();
+        Pointer memory = plugin.customMemoryGet();
         if (memory == null) {
             return Either.left(Types.Error.ErrorExportsNotFound);
         }

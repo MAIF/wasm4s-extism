@@ -261,7 +261,6 @@ public class Plugin implements AutoCloseable {
 
     @Override
     public void close() {
-        System.out.println("FREE PLUGIN HAPPENED");
         free();
     }
 
@@ -273,8 +272,12 @@ public class Plugin implements AutoCloseable {
         return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset, namespace, name);
     }
 
-    public Pointer getMemory(String name, String namespace) {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_get_memory(this.pluginPointer, name, namespace);
+    public Pointer getLinearMemory(String name, String namespace) {
+        return LibExtism.INSTANCE.linear_memory_get(this.pluginPointer, name, namespace);
+    }
+
+    public void resetLinearMemory(String namespace, String name) {
+        LibExtism.INSTANCE.linear_memory_reset(this.pluginPointer, namespace, name);
     }
 
     public int getMemorySize() {
