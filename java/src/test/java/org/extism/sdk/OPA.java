@@ -164,10 +164,6 @@ public class OPA {
         return new Tuple(Integer.parseInt(dataAddr), data_heap_ptr);
     }
 
-    void reset() {
-        plugin.resetLinearMemory("env", "memory");
-    }
-
     String evaluate(
             int dataAddr,
             int baseHeapPtr,
@@ -193,7 +189,7 @@ public class OPA {
 
         var ret = plugin.call("opa_eval", ptr, 1);
 
-        var memory = plugin.getLinearMemory("memory", "env");
+        var memory = plugin.getLinearMemory("env", "memory");
 
         var offset    = ret.getValue(0).v.i32;
         var arraySize = 65356;

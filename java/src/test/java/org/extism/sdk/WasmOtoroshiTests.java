@@ -225,8 +225,6 @@ public class WasmOtoroshiTests {
 
         assertEquals("[{\"result\":true}]", result);
 
-        opa.reset();
-
         result = opa.evaluate(
                 (int)values.toArray()[0],
                 (int)values.toArray()[1],
@@ -240,18 +238,6 @@ public class WasmOtoroshiTests {
 
         assertEquals("[{\"result\":false}]", result);
     }
-
-//    @Test
-//    public void shouldBeCallable() {
-//        var manifest = new Manifest(Collections.singletonList(CODE.getMajorRelease()), new MemoryOptions(50));
-//
-//        try(var plugin = new Plugin(manifest, true, null)) {
-//            try(var params = new Parameters(2)
-//                    .pushInts(2, 3)) {
-//                plugin.callWithoutResults("failed", params);
-//            }
-//        }
-//    }
 
     @Test
     public void corazaShouldWorks() {
@@ -275,46 +261,62 @@ public class WasmOtoroshiTests {
         VMData data = new VMData(headers);
         var plugin = new ProxyWasmPlugin(manifest, data);
 
-        plugin.start().run();
+        plugin.start();
+        plugin.run();
+        plugin.plugin.resetCustomMemory();
+        plugin.start();
+        plugin.run();
     }
 
-//    @Test
-//    public void getEnvMemorySize() {
-//         var manifest = new Manifest(Collections.singletonList(CODE.pathWasmWebAssemblyFunctionSource()));
-//
-//        var parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
-//        var resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
-//
-//        var functions = new HostFunction[]{
-//                new HostFunction<>(
-//                        "hello_world",
-//                        parametersTypes,
-//                        resultsTypes,
-//                        (plugin, params, returns, data) -> {
-//                            System.out.println("Hello from Java Host Function!");
-//
-//                            var memory = plugin.getLinearMemory("memory");
-//                            var arraySize = 65356;
-//                            var mem = memory.getByteArray(0, arraySize);
-//                            var size = lastValidByte(mem);
-//                            System.out.println("Memory content : " + new String(Arrays.copyOf(mem, size), StandardCharsets.UTF_8));
-//                        },
-//                        Optional.empty()
-//                ).withNamespace("env")
-//        };
-//
-//        var memory = new LinearMemory("memory", "env", new LinearMemoryOptions(1, Optional.empty()));
-//
-//        try(var instance = new Plugin(manifest, true, functions, new LinearMemory[]{
-////                memory
-//        })) {
-//            var message = "foo bar message";
-//            instance.writeBytes(message.getBytes(StandardCharsets.UTF_8), message.length(), 0, null, "memory");
-//
-//            instance.call("execute", "".getBytes(StandardCharsets.UTF_8));
-//
-//            System.out.println(instance.getMemorySize());
-//        }
-//    }
+    @Test
+    public void getEnvMemorySize() {
+         var manifest = new Manifest(Collections.singletonList(CODE.pathWasmWebAssemblyFunctionSource()));
 
+         var message = "foo bar message";
+         String namespace = "env";
+         String name = "memory";
+
+        var parametersTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+        var resultsTypes = new LibExtism.ExtismValType[]{LibExtism.ExtismValType.I64};
+
+        var functions = new HostFunction[]{
+                new HostFunction<>(
+                        "hello_world",
+                        parametersTypes,
+                        resultsTypes,
+                        (plugin, params, returns, data) -> {
+                            System.out.println("Hello from Java Host Function!");
+
+                            var memory = plugin.linearMemoryGet(namespace, name);
+                            var arraySize = 65356;
+                            var mem = memory.getByteArray(0, arraySize);
+                            var size = lastValidByte(mem);
+                            assertEquals(message, new String(Arrays.copyOf(mem, size), StandardCharsets.UTF_8));
+                        },
+                        Optional.empty()
+                ).withNamespace(namespace)
+        };
+
+        var memory = new LinearMemory(name, namespace, new LinearMemoryOptions(1, Optional.empty()));
+
+        try(var instance = new Plugin(manifest, true, functions, new LinearMemory[]{
+                memory
+        })) {
+            instance.writeBytes(message.getBytes(StandardCharsets.UTF_8), message.length(), 0, namespace, name);
+            instance.call("execute", "".getBytes(StandardCharsets.UTF_8));
+
+            System.out.println("Linear memory size : " + instance.getLinearMemorySize(namespace, name));
+            instance.resetLinearMemory(namespace, name);
+
+            checkLinearMemorySize(instance, namespace, name);
+        }
+    }
+
+    void checkLinearMemorySize(Plugin instance, String namespace, String name) {
+        var linearMemory = instance.getLinearMemory(namespace, name);
+        var arraySize = 65356;
+        var mem = linearMemory.getByteArray(0, arraySize);
+        var size = lastValidByte(mem);
+        assertEquals("", new String(Arrays.copyOf(mem, size), StandardCharsets.UTF_8));
+    }
 }

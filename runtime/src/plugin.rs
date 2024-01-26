@@ -320,6 +320,9 @@ impl Plugin {
         }
 
         let instance_pre = linker.instantiate_pre(main)?;
+
+        // panic!("{:#?}", linker.get(store, EXTISM_ENV_MODULE, "memory"));
+
         let timer_tx = Timer::tx();
         let mut plugin = Plugin {
             modules,
@@ -405,12 +408,12 @@ impl Plugin {
 
         let instance = self.instance_pre.instantiate(&mut self.store)?;
 
-        let memory = instance.get_memory(&mut self.store, "memory").unwrap();
-
-        let store = &mut self.store as *mut _;
-        self.current_plugin_mut().memory_export = Box::into_raw(Box::new(
-            PluginMemory::new(store, memory)
-        ));
+        if let Some(memory) = instance.get_memory(&mut self.store, "memory")  {
+            let store = &mut self.store as *mut _;
+            self.current_plugin_mut().memory_export = Box::into_raw(Box::new(
+                PluginMemory::new(store, memory)
+            ));
+        }
 
         trace!(
             plugin = self.id.to_string(),

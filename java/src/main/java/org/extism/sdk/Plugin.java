@@ -272,15 +272,23 @@ public class Plugin implements AutoCloseable {
         return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_write_bytes(this.pluginPointer, data, n, offset, namespace, name);
     }
 
-    public Pointer getLinearMemory(String name, String namespace) {
-        return LibExtism.INSTANCE.linear_memory_get(this.pluginPointer, name, namespace);
+    public Pointer getLinearMemory(String namespace, String name) {
+        return LibExtism.INSTANCE.linear_memory_get_from_plugin(this.pluginPointer, namespace, name);
     }
 
     public void resetLinearMemory(String namespace, String name) {
-        LibExtism.INSTANCE.linear_memory_reset(this.pluginPointer, namespace, name);
+        LibExtism.INSTANCE.linear_memory_reset_from_plugin(this.pluginPointer, namespace, name);
+    }
+
+    public int getLinearMemorySize(String namespace, String name) {
+        return LibExtism.INSTANCE.linear_memory_size_from_plugin(this.pluginPointer, namespace, name);
     }
 
     public int getMemorySize() {
-        return LibExtism.INSTANCE.wasm_otoroshi_extism_memory_bytes(this.pluginPointer);
+        return LibExtism.INSTANCE.custom_memory_size_from_plugin(this.pluginPointer);
+    }
+
+    public void resetCustomMemory() {
+        LibExtism.INSTANCE.custom_memory_reset_from_plugin(this.pluginPointer);
     }
 }

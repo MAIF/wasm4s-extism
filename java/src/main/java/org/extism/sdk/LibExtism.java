@@ -283,11 +283,16 @@ public interface LibExtism extends Library {
     int custom_memory_length(Pointer plugin, long n);
     int custom_memory_alloc(Pointer plugin, long n);
     void custom_memory_free(Pointer plugin, long ptr);
-    void custom_memory_size(Pointer plugin);
+    int custom_memory_size_from_plugin(Pointer plugin);
+    void custom_memory_reset_from_plugin(Pointer plugin);
 
     Pointer linear_memory_get(Pointer plugin, String namespace, String name);
     int linear_memory_size(Pointer plugin, String namespace, String name, long n);
-    void linear_memory_reset(Pointer plugin, String namespace, String name);
+
 //    int linear_memory_alloc(Pointer plugin, String namespace, String name, long n);
 //    void linear_memory_free(Pointer plugin, String namespace, String name, long ptr);
+
+    void linear_memory_reset_from_plugin(Pointer plugin, String namespace, String name);
+    int linear_memory_size_from_plugin(Pointer plugin, String namespace, String name);
+    Pointer linear_memory_get_from_plugin(Pointer plugin, String namespace, String name);
 }

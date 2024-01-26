@@ -133,7 +133,7 @@ ExtismMemory *wasm_otoroshi_create_wasmtime_memory(const char *name,
 /**
  * Remove all plugins from the registry
  */
-void custom_memory_reset(ExtismPlugin *plugin);
+void custom_memory_reset_from_plugin(ExtismPlugin *plugin);
 
 int8_t wasm_otoroshi_extism_memory_write_bytes(ExtismPlugin *instance_ptr,
                                                const uint8_t *data,
@@ -142,15 +142,25 @@ int8_t wasm_otoroshi_extism_memory_write_bytes(ExtismPlugin *instance_ptr,
                                                const char *namespace_,
                                                const char *name);
 
-uint8_t *linear_memory_get(ExtismPlugin *plugin, const char *name, const char *namespace_);
+uint8_t *linear_memory_get(ExtismCurrentPlugin *plugin, const char *namespace_, const char *name);
+
+uint8_t *linear_memory_get_from_plugin(ExtismPlugin *plugin,
+                                       const char *namespace_,
+                                       const char *name);
 
 uintptr_t linear_memory_size(ExtismPlugin *instance_ptr, const char *namespace_, const char *name);
 
-uintptr_t linear_memory_reset(ExtismPlugin *instance_ptr, const char *namespace_, const char *name);
+void linear_memory_reset_from_plugin(ExtismPlugin *instance_ptr,
+                                     const char *namespace_,
+                                     const char *name);
 
 uint8_t *custom_memory_get(ExtismCurrentPlugin *plugin);
 
-uintptr_t custom_memory_size(ExtismCurrentPlugin *plugin);
+uintptr_t custom_memory_size_from_plugin(ExtismPlugin *plugin);
+
+uintptr_t linear_memory_size_from_plugin(ExtismPlugin *plugin,
+                                         const char *namespace_,
+                                         const char *name);
 
 ExtismSize custom_memory_length(ExtismCurrentPlugin *plugin, ExtismSize n);
 
