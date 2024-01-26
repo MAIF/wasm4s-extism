@@ -198,8 +198,8 @@ impl MemoryRoot {
     fn pointer_in_bounds_fast(p: Pointer) -> bool {
         // Similar to `pointer_in_bounds` but less accurate on the upper bound. This uses the total memory size,
         // instead of checking `MemoryRoot::length`
-        let end = core::arch::wasm32::memory_size(0) << 16;
-        p >= core::mem::size_of::<Self>() as Pointer && p <= end as Pointer
+        let end = (core::arch::wasm32::memory_size(0) as u64) << 16;
+        p >= core::mem::size_of::<Self>() as Pointer && p <= end as u64
     }
 
     // Find a block that is free to use, this can be a new block or an existing freed block. The `self_position` argument
@@ -228,7 +228,7 @@ impl MemoryRoot {
             if status == MemoryStatus::Free as u8 && b.size >= length as usize {
                 // Split block if there is too much excess
                 if b.size - length as usize >= 128 {
-                    b.size -= length as usize;
+                    b.size -= length as usize + core::mem::size_of::<MemoryBlock>();
                     b.used = 0;
 
                     let block1 = b.data.as_mut_ptr().add(b.size) as *mut MemoryBlock;
@@ -270,12 +270,13 @@ impl MemoryRoot {
 
         // Get the number of bytes available
         let mem_left = self_length - self_position - core::mem::size_of::<MemoryRoot>() as u64;
+        let length_with_block = length + core::mem::size_of::<MemoryBlock>() as u64;
 
         // When the allocation is larger than the number of bytes available
         // we will need to try to grow the memory
-        if length >= mem_left {
+        if length_with_block >= mem_left {
             // Calculate the number of pages needed to cover the remaining bytes
-            let npages = num_pages(length - mem_left);
+            let npages = num_pages(length_with_block - mem_left);
             let x = core::arch::wasm32::memory_grow(0, npages);
             if x == usize::MAX {
                 return None;
@@ -573,4 +574,68 @@ pub unsafe fn error_get() -> Handle {
 #[no_mangle]
 pub unsafe fn memory_bytes() -> u64 {
     MemoryRoot::new().length.load(Ordering::Acquire)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::*;
+    use wasm_bindgen_test::*;
+
+    // See https://github.com/extism/extism/pull/659
+    #[wasm_bindgen_test]
+    fn test_659() {
+        unsafe {
+            // Warning: These offsets will need to change if we adjust the kernel memory layout at all
+            reset();
+            assert_eq!(alloc(1065), 77);
+            assert_eq!(alloc(288), 1154);
+            assert_eq!(alloc(128), 1454);
+            assert_eq!(length(1154), 288);
+            assert_eq!(length(1454), 128);
+            free(1454);
+            assert_eq!(alloc(213), 1594);
+            length_unsafe(1594);
+            assert_eq!(alloc(511), 1819);
+            assert_eq!(alloc(4), 1454);
+            assert_eq!(length(1454), 4);
+            assert_eq!(length(1819), 511);
+            assert_eq!(alloc(13), 2342);
+            assert_eq!(length(2342), 13);
+            assert_eq!(alloc(336), 2367);
+            assert_eq!(alloc(1077), 2715);
+            assert_eq!(length(2367), 336);
+            assert_eq!(length(2715), 1077);
+            free(2715);
+            assert_eq!(alloc(1094), 3804);
+            length_unsafe(3804);
+
+            // Allocate 4 bytes, expect to receive address 3788
+            assert_eq!(alloc(4), 3788);
+
+            assert_eq!(alloc(4), 3772);
+            assert_eq!(length(3772), 4);
+
+            // Address 3788 has not been freed yet, so expect it to have 4 bytes allocated
+            assert_eq!(length(3788), 4);
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn test_oom() {
+        let size = 1024 * 1024 * 5;
+
+        let mut last = 0;
+        for _ in 0..1024 {
+            unsafe {
+                let ptr = alloc(size);
+                last = ptr;
+                if ptr == 0 {
+                    break;
+                }
+                assert_eq!(length(ptr), size);
+            }
+        }
+
+        assert_eq!(last, 0);
+    }
 }
