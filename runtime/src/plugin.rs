@@ -222,7 +222,7 @@ impl Plugin {
         // Setup wasmtime types
         let mut config = Config::new();
         config
-            // .epoch_interruption(true)
+            .epoch_interruption(true)
             .debug_info(debug_options.debug_info)
             .coredump_on_trap(debug_options.coredump.is_some())
             .profiler(debug_options.profiling_strategy)
@@ -261,7 +261,7 @@ impl Plugin {
             &engine,
             CurrentPlugin::new(manifest, with_wasi, available_pages, id)?,
         );
-        // store.set_epoch_deadline(1);
+        store.set_epoch_deadline(1);
 
         let mut linker = Linker::new(&engine);
         linker.allow_shadowing(true);
@@ -356,42 +356,42 @@ impl Plugin {
     // Resets the store and linker to avoid running into Wasmtime memory limits
     pub(crate) fn reset_store(
         &mut self,
-        _instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
+        instance_lock: &mut std::sync::MutexGuard<Option<Instance>>,
     ) -> Result<(), Error> {
         if self.store_needs_reset {
-            // let engine = self.store.engine().clone();
-            // let internal = self.current_plugin_mut();
-            // self.store = Store::new(
-            //     &engine,
-            //     CurrentPlugin::new(
-            //         internal.manifest.clone(),
-            //         internal.wasi.is_some(),
-            //         internal.available_pages,
-            //         self.id,
-            //     )?,
-            // );
-            // // self.store.set_epoch_deadline(1);
-            // let store = &mut self.store as *mut _;
-            // let linker = &mut self.linker as *mut _;
+            let engine = self.store.engine().clone();
+            let internal = self.current_plugin_mut();
+            self.store = Store::new(
+                &engine,
+                CurrentPlugin::new(
+                    internal.manifest.clone(),
+                    internal.wasi.is_some(),
+                    internal.available_pages,
+                    self.id,
+                )?,
+            );
+            // self.store.set_epoch_deadline(1);
+            let store = &mut self.store as *mut _;
+            let linker = &mut self.linker as *mut _;
 
-            // let current_plugin = self.current_plugin_mut();
-            // current_plugin.store = store;
-            // current_plugin.linker = linker;
-            // if current_plugin.available_pages.is_some() {
-            //     self.store
-            //         .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
-            // }
+            let current_plugin = self.current_plugin_mut();
+            current_plugin.store = store;
+            current_plugin.linker = linker;
+            if current_plugin.available_pages.is_some() {
+                self.store
+                    .limiter(|internal| internal.memory_limiter.as_mut().unwrap());
+            }
 
-            // let main = &self.modules[MAIN_KEY];
-            // for (name, module) in self.modules.iter() {
-            //     if name != MAIN_KEY {
-            //         self.linker.module(&mut self.store, name, module)?;
-            //     }
-            // }
-            // self.instantiations = 0;
-            // self.instance_pre = self.linker.instantiate_pre(main)?;
-            // **instance_lock = None;
-            // self.store_needs_reset = false;
+            let main = &self.modules[MAIN_KEY];
+            for (name, module) in self.modules.iter() {
+                if name != MAIN_KEY {
+                    self.linker.module(&mut self.store, name, module)?;
+                }
+            }
+            self.instantiations = 0;
+            self.instance_pre = self.linker.instantiate_pre(main)?;
+            **instance_lock = None;
+            self.store_needs_reset = false;
         }
         Ok(())
     }

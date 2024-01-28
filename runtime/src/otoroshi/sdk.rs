@@ -1,6 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::{os::raw::c_char, sync::MutexGuard};
+use std::os::raw::c_char;
 
 use crate::{
     function,

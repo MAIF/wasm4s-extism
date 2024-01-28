@@ -266,6 +266,8 @@ public class WasmOtoroshiTests {
         plugin.plugin.resetCustomMemory();
         plugin.start();
         plugin.run();
+
+        plugin.plugin.free();
     }
 
     @Test
